@@ -1,4 +1,3 @@
-import os
 import subprocess
 from itertools import product
 
@@ -9,8 +8,6 @@ from auto_sbatch.experiment_handler import ExperimentHandler
 default_auto_sbatch_conf = {
     "-J": "run",
     "-N": 1,
-    "-o": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_out.log",
-    "-e": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_err.log",
     "python_environment": "???",
     "work_directory": ".",
     "run_work_directory": ".",
@@ -26,7 +23,7 @@ class SBatch:
         self._available_slurm_commands = ["-J", "-N", "-n", "-o", "-e", "--gres", "--mem",
                                           "--time", "--mail-user", "--mail-type", "--array"]
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
-                               "--grid-search"]
+                               "--grid-search", "run_registry_path"]
         self._commands = []
 
         self.set_grid_search()
