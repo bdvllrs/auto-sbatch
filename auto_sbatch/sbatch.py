@@ -4,7 +4,7 @@ from itertools import product
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
-from auto_sbatch.utils import ExperimentHandler
+from auto_sbatch.experiment_handler import ExperimentHandler
 
 default_auto_sbatch_conf = {
     "-J": "run",
@@ -19,17 +19,39 @@ default_auto_sbatch_conf = {
 
 
 class SBatch:
-    def __init__(self, experiment_handler: ExperimentHandler, sbatch_params=None):
+    def __init__(self, sbatch_params=None, experiment_handler: ExperimentHandler = None):
         self.experiment_handler = experiment_handler
         self.slurm_script = "#!/bin/sh"
-        self._params = sbatch_params
+        self._params = OmegaConf.create(sbatch_params)
         self._available_slurm_commands = ["-J", "-N", "-n", "-o", "-e", "--gres", "--mem",
                                           "--time", "--mail-user", "--mail-type", "--array"]
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
                                "--grid-search"]
         self._commands = []
 
-        self.add_commands(self.experiment_handler.new_run())
+        self.set_grid_search()
+
+        if self.experiment_handler is None and "--run-script" not in self._params:
+            raise ValueError(f"Missing --run-script param")
+
+        if self.experiment_handler is not None:
+            self.add_commands(self.experiment_handler.new_run())
+
+    def set_grid_search(self):
+        if "--grid-search" in self._params and "--array" not in self._params:
+            print("Detected Grid-Search, adding --array=auto option for you.")
+            self._params["--array"] = "auto"
+
+        if "--array" in self._params:
+            n_jobs = None
+            if "--grid-search" in self._params:
+                n_jobs, self._params = get_grid_combinations(self._params)
+            if self._params["--array"] == "auto":
+                assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
+                self._params["--array"] = f"0-{n_jobs - 1}"
+
+                if n_jobs == 1:
+                    del self._params["--array"]
 
     def get_num_gpus(self):
         if '--gres' in self._params:
@@ -47,6 +69,9 @@ class SBatch:
 
     def make_slurm_script(self):
         dot_params = walk_dict(self._params)
+        script_name = self._params[
+            "--run-script"] if "--run-script" in self._params else self.experiment_handler.script_location.name
+
         for key, value in dot_params.items():
             if key in self._available_slurm_commands:
                 if key[:2] == "--":
@@ -66,8 +91,7 @@ class SBatch:
 
         self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params else "0")
 
-        self.slurm_script += f'\npython "{self.experiment_handler.script_location.name}" ' \
-                             f'"gpus={self.get_num_gpus()}"'
+        self.slurm_script += f'\npython "{script_name}" "gpus={self.get_num_gpus()}"'
         for key, value in walk_dict(dot_params).items():
             if key not in self._available_slurm_commands and key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
@@ -85,7 +109,7 @@ class SBatch:
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
-        out, err = b"", b""
+        # out, err = b"", b""
         print("Running generated SLURM script:")
         print(self.slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
@@ -123,39 +147,28 @@ def get_grid_combinations(args):
     return n_jobs, OmegaConf.merge(args, new_values)
 
 
-def auto_sbatch(arg_config=None):
+def auto_sbatch(arg_config=None, handler=None):
+    SBatch(arg_config, handler)()
+
+
+def main(arg_config=None):
     conf = OmegaConf.create(default_auto_sbatch_conf)
     if arg_config is not None:
+        arg_config = OmegaConf.create(arg_config)
         conf = OmegaConf.merge(conf, arg_config)
     cli_args = OmegaConf.from_cli()
     conf = OmegaConf.merge(conf, cli_args)
 
-    if "--grid-search" in conf and "--array" not in conf:
-        print("Detected Grid-Search, adding --array=auto option for you.")
-        conf["--array"] = "auto"
-
-    if "--array" in conf:
-        n_jobs = None
-        if "--grid-search" in conf:
-            n_jobs, conf = get_grid_combinations(conf)
-        if conf["--array"] == "auto":
-            assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
-            conf["--array"] = f"0-{n_jobs - 1}"
-
-            if n_jobs == 1:
-                del conf["--array"]
-
-    handler = ExperimentHandler(
-        conf.python_environment,
-        conf.work_directory,
-        conf.run_work_directory,
-        conf.script_location,
-        "--array" in conf
-    )
-
-    sbatch = SBatch(handler, conf)
-    sbatch()
+    handler = None
+    if "python_environment" in conf:
+        handler = ExperimentHandler(
+            conf.python_environment,
+            conf.work_directory,
+            conf.run_work_directory,
+            conf.script_location
+        )
+    auto_sbatch(conf, handler)
 
 
 if __name__ == '__main__':
-    auto_sbatch()
+    main()

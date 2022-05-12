@@ -19,7 +19,7 @@ setup(name='auto_sbatch',
       packages=find_packages(),
       entry_points={
           'console_scripts': [
-              'auto-sbatch=auto_sbatch.auto_sbatch:auto_sbatch',
+              'auto-sbatch=auto_sbatch.sbatch:main',
               'register-run=auto_sbatch.register_run:register_run'
           ]
       })
