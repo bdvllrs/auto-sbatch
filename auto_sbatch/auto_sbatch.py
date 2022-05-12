@@ -130,6 +130,10 @@ def auto_sbatch(arg_config=None):
     cli_args = OmegaConf.from_cli()
     conf = OmegaConf.merge(conf, cli_args)
 
+    if "--grid-search" in conf and "--array" not in conf:
+        print("Detected Grid-Search, adding --array=auto option for you.")
+        conf["--array"] = "auto"
+
     if "--array" in conf:
         n_jobs = None
         if "--grid-search" in conf:
