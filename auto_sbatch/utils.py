@@ -70,7 +70,7 @@ class ExperimentHandler:
             f'cp -r {str(self.work_directory)} $runWorkdirJob',
             f'cd "$runWorkdirJob/{self.work_directory.absolute().name}/{str(self.script_location.parent)}"',
             f'register-run registry={str(self.run_registry_path.absolute())} '
-            f'job_id=$jobId status="started" location="$runWorkdirJob"',
+            f'job_id=$jobId status="started" location="$runWorkdirJob/{self.work_directory.absolute().name}/{str(self.script_location)}"',
             'module purge',
         ])
         commands.extend([f'module load {module}' for module in self.run_modules])
