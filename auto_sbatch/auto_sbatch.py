@@ -130,7 +130,7 @@ def auto_sbatch(arg_config=None):
         "--array" in conf
     )
 
-    sbatch = SBatch(handler, OmegaConf.to_container(conf))
+    sbatch = SBatch(handler, OmegaConf.to_object(conf))
     sbatch()
 
 
