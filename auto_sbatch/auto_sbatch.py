@@ -19,13 +19,14 @@ default_auto_sbatch_conf = {
 
 
 class SBatch:
-    def __init__(self, experiment_handler: 'ExperimentHandler', sbatch_params=None):
+    def __init__(self, experiment_handler: ExperimentHandler, sbatch_params=None):
         self.experiment_handler = experiment_handler
         self.slurm_script = "#!/bin/sh"
         self._params = sbatch_params
         self._available_slurm_commands = ["-J", "-N", "-n", "-o", "-e", "--gres", "--mem",
                                           "--time", "--mail-user", "--mail-type", "--array"]
-        self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location"]
+        self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
+                               "--grid-search"]
         self._commands = []
 
         self.add_commands(self.experiment_handler.new_run())
@@ -45,28 +46,34 @@ class SBatch:
             self.add_command(command)
 
     def make_slurm_script(self):
-        if self._params is not None:
-            for key, value in self._params.items():
-                if key in self._available_slurm_commands:
-                    if key[:2] == "--":
-                        self.slurm_script += f"\n#SBATCH {key}={value}"
-                    elif key[:1] == "-":
-                        self.slurm_script += f"\n#SBATCH {key} {value}"
-            self.slurm_script += "\n"
+        dot_params = walk_dict(self._params)
+        for key, value in dot_params.items():
+            if key in self._available_slurm_commands:
+                if key[:2] == "--":
+                    self.slurm_script += f"\n#SBATCH {key}={value}"
+                elif key[:1] == "-":
+                    self.slurm_script += f"\n#SBATCH {key} {value}"
+        self.slurm_script += "\n"
         for command in self._commands:
             self.slurm_script += f"\n{command}"
 
-        for key, value in walk_dict(self._params).items():
+        for key, value in walk_dict(dot_params).items():
             if key not in self._available_slurm_commands and key not in self._reserved_args:
-                if isinstance(value, list) and "--array" in self._params:
-                    self.slurm_script += '\n' + key + 'Param=("' + '" "'.join(map(str, value)) + '")'
+                if ("--grid-search" in dot_params and
+                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
+                    key_var = key.replace(".", "").replace("/", "")
+                    self.slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
+
+        self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params else "0")
 
         self.slurm_script += f'\npython "{self.experiment_handler.script_location.name}" ' \
                              f'"gpus={self.get_num_gpus()}"'
-        for key, value in walk_dict(self._params).items():
+        for key, value in walk_dict(dot_params).items():
             if key not in self._available_slurm_commands and key not in self._reserved_args:
-                if isinstance(value, list) and "--array" in self._params:
-                    self.slurm_script += ' "' + key + '=${' + key + 'Param[$SLURM_ARRAY_TASK_ID]}"'
+                if ("--grid-search" in dot_params and
+                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
+                    key_var = key.replace(".", "").replace("/", "")
+                    self.slurm_script += ' "' + key + '=${' + key_var + 'Param[$taskId]}"'
                 else:
                     self.slurm_script += f' "{key}={value}"'
         self.slurm_script += ' "checkpoints_dir=\'../../checkpoints/$jobId\'"'
@@ -78,7 +85,7 @@ class SBatch:
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
-        # out, err = b"", b""
+        out, err = b"", b""
         print("Running generated SLURM script:")
         print(self.slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
@@ -88,19 +95,22 @@ class SBatch:
             print(err)
 
 
-def walk_dict(d, prefix=[], only_lists=False):
+def walk_dict(d, prefix=[], cond=None):
     new_dic = {}
-    for key, val in d.items():
-        if type(val) is DictConfig:
-            new_dic.update(walk_dict(val, prefix + [key], only_lists))
-        else:
-            if not only_lists or isinstance(val, ListConfig):
-                new_dic[".".join(prefix + [key])] = val
+    if d is not None:
+        for key, val in d.items():
+            if type(val) is DictConfig:
+                new_dic.update(walk_dict(val, prefix + [key], cond))
+            else:
+                dotted_key = ".".join(prefix + [key])
+                if cond is None or cond(dotted_key, val):
+                    new_dic[dotted_key] = val
     return new_dic
 
 
 def get_grid_combinations(args):
-    unstructured_dict = walk_dict(args, only_lists=True)
+    cond = lambda key, val: key in args["--grid-search"] and isinstance(val, ListConfig)
+    unstructured_dict = walk_dict(args, cond=cond)
 
     keys, values = zip(*unstructured_dict.items())
     all_combinations = list(product(*values))
@@ -121,9 +131,15 @@ def auto_sbatch(arg_config=None):
     conf = OmegaConf.merge(conf, cli_args)
 
     if "--array" in conf:
-        n_jobs, conf = get_grid_combinations(conf)
+        n_jobs = None
+        if "--grid-search" in conf:
+            n_jobs, conf = get_grid_combinations(conf)
         if conf["--array"] == "auto":
+            assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
             conf["--array"] = f"0-{n_jobs - 1}"
+
+            if n_jobs == 1:
+                del conf["--array"]
 
     handler = ExperimentHandler(
         conf.python_environment,
@@ -133,7 +149,7 @@ def auto_sbatch(arg_config=None):
         "--array" in conf
     )
 
-    sbatch = SBatch(handler, OmegaConf.to_object(conf))
+    sbatch = SBatch(handler, conf)
     sbatch()
 
 

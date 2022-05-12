@@ -17,8 +17,9 @@ class ExperimentHandler:
         self.run_registry_path = Path(os.getenv("RUN_REGISTRY_LOCATION", "~/run_registry.csv"))
         self.is_array = is_array
 
-        assert ((self.work_directory / self.script_location).exists(),
-                f"Script file does not exist. You are trying to run {self.work_directory / self.script_location}.")
+        if not (self.work_directory / self.script_location).exists():
+            raise ValueError(f"Script file does not exist. "
+                             f"You are trying to run {self.work_directory / self.script_location}.")
 
         self.modules = ["python/3.8.5"]
         self.run_modules = ["python/3.8.5", "cuda/11.5"]
