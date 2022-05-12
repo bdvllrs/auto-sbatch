@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 def run(commands):
-    print(" ".join(commands))
+    # print(" ".join(commands))
     subprocess.run(" ".join(commands), shell=True)
 
 
@@ -16,6 +16,9 @@ class ExperimentHandler:
         self.python_environment = Path(os.getenv("VENV_FOLDER")) / python_environment
         self.run_registry_path = Path(os.getenv("RUN_REGISTRY_LOCATION", "~/run_registry.csv"))
         self.is_array = is_array
+
+        assert ((self.work_directory / self.script_location).exists(),
+                f"Script file does not exist. You are trying to run {self.work_directory / self.script_location}.")
 
         self.modules = ["python/3.8.5"]
         self.run_modules = ["python/3.8.5", "cuda/11.5"]
@@ -65,7 +68,7 @@ class ExperimentHandler:
             'mkdir "$runWorkdirJob/checkpoints"',
 
             f'cp -r {str(self.work_directory)} $runWorkdirJob',
-            f'cd "$runWorkdirJob/{str(self.script_location.parent)}"',
+            f'cd "$runWorkdirJob/{self.work_directory.absolute().name}/{str(self.script_location.parent)}"',
             f'register-run registry={str(self.run_registry_path.absolute())} '
             f'job_id=$jobId status="started" location="$runWorkdirJob"',
             'module purge',

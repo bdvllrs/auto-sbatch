@@ -78,11 +78,14 @@ class SBatch:
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
+        # out, err = b"", b""
         print("Running generated SLURM script:")
         print(self.slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
-        print(out)
-        print(err)
+        if len(out):
+            print(out)
+        if len(err):
+            print(err)
 
 
 def walk_dict(d, prefix=[], only_lists=False):
