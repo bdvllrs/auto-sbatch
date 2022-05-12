@@ -6,6 +6,17 @@ from omegaconf import OmegaConf, DictConfig, ListConfig
 
 from auto_sbatch.utils import ExperimentHandler
 
+default_auto_sbatch_conf = {
+    "-J": "run",
+    "-N": 1,
+    "-o": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_out.log",
+    "-e": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_err.log",
+    "python_environment": "???",
+    "work_directory": ".",
+    "run_work_directory": ".",
+    "script_location": "???"
+}
+
 
 class SBatch:
     def __init__(self, experiment_handler: 'ExperimentHandler', sbatch_params=None):
@@ -99,18 +110,10 @@ def get_grid_combinations(args):
     return n_jobs, OmegaConf.merge(args, new_values)
 
 
-def auto_sbatch():
-    default_args = {
-        "-J": "run",
-        "-N": 1,
-        "-o": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_out.log",
-        "-e": f"{os.getenv('SLURM_OUTPUT_LOG_DIR', '..')}/%j_err.log",
-        "python_environment": "???",
-        "work_directory": ".",
-        "run_work_directory": ".",
-        "script_location": "???"
-    }
-    conf = OmegaConf.create(default_args)
+def auto_sbatch(arg_config=None):
+    conf = OmegaConf.create(default_auto_sbatch_conf)
+    if arg_config is not None:
+        conf = OmegaConf.merge(conf, arg_config)
     cli_args = OmegaConf.from_cli()
     conf = OmegaConf.merge(conf, cli_args)
 
