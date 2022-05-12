@@ -1,11 +1,12 @@
-import os
 import subprocess
 from pathlib import Path
 
 
 def run(commands):
-    # print(" ".join(commands))
-    subprocess.run(" ".join(commands), shell=True)
+    if isinstance(commands, list):
+        commands = " ".join(commands)
+    # print(commands)
+    subprocess.run(commands, shell=True)
 
 
 class ExperimentHandler:
