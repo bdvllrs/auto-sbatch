@@ -4,7 +4,7 @@ from itertools import product
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
-from utils import ExperimentHandler
+from auto_sbatch.utils import ExperimentHandler
 
 
 class SBatch:

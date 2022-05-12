@@ -1,1 +1,1 @@
-omegaconf==2.1.2
+omegaconf>=2.1.1
