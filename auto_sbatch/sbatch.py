@@ -1,9 +1,11 @@
 import subprocess
 from itertools import product
+from typing import List
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
 from auto_sbatch.experiment_handler import ExperimentHandler
+from auto_sbatch.processes import Command, run
 
 default_auto_sbatch_conf = {
     "-J": "run",
@@ -24,7 +26,7 @@ class SBatch:
                                           "--time", "--mail-user", "--mail-type", "--array"]
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
                                "--grid-search", "run_registry_path"]
-        self._commands = []
+        self._commands: List[Command] = []
 
         self.set_grid_search()
 
@@ -58,6 +60,8 @@ class SBatch:
         return 0
 
     def add_command(self, command):
+        if not isinstance(command, Command):
+            command = Command(command)
         self._commands.append(command)
 
     def add_commands(self, commands):
@@ -77,7 +81,7 @@ class SBatch:
                     self.slurm_script += f"\n#SBATCH {key} {value}"
         self.slurm_script += "\n"
         for command in self._commands:
-            self.slurm_script += f"\n{command}"
+            self.slurm_script += f"\n{command.get()}"
 
         for key, value in walk_dict(dot_params).items():
             if key not in self._available_slurm_commands and key not in self._reserved_args:
@@ -106,7 +110,6 @@ class SBatch:
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
-        # out, err = b"", b""
         print("Running generated SLURM script:")
         print(self.slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
@@ -146,7 +149,7 @@ def get_grid_combinations(args):
 
 def auto_sbatch(arg_config=None, handler=None):
     SBatch(arg_config, handler)()
-
+    run("test")
 
 def main(arg_config=None):
     conf = OmegaConf.create(default_auto_sbatch_conf)

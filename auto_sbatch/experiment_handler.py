@@ -1,12 +1,6 @@
-import subprocess
 from pathlib import Path
 
-
-def run(commands):
-    if isinstance(commands, list):
-        commands = " ".join(commands)
-    # print(commands)
-    subprocess.run(commands, shell=True)
+from auto_sbatch.processes import run, Command
 
 
 class ExperimentHandler:
@@ -61,7 +55,13 @@ class ExperimentHandler:
 
         # add_run_location = Path(__file__).parent / "register_run.py"
         commands = [
-            "jobId=$SLURM_JOB_ID",
+            Command("""if [ -z "$SLURM_ARRAY_JOB_ID" ]
+then
+    jobId=$SLURM_JOB_ID
+else
+    jobId=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
+fi
+"""),
             f"runWorkdirJob={str(self.run_work_directory)}/$jobId",
         ]
 
