@@ -55,13 +55,7 @@ class ExperimentHandler:
 
         # add_run_location = Path(__file__).parent / "register_run.py"
         commands = [
-            Command("""if [ -z "$SLURM_ARRAY_JOB_ID" ]
-then
-    jobId=$SLURM_JOB_ID
-else
-    jobId=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}
-fi
-"""),
+            "jobId=$SLURM_JOB_ID",
             f"runWorkdirJob={str(self.run_work_directory)}/$jobId",
         ]
 
