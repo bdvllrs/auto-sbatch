@@ -5,11 +5,13 @@ from typing import List
 from omegaconf import OmegaConf, DictConfig, ListConfig
 
 from auto_sbatch.experiment_handler import ExperimentHandler
-from auto_sbatch.processes import Command, run
+from auto_sbatch.processes import Command
 
 default_auto_sbatch_conf = {
-    "-J": "run",
-    "-N": 1,
+    "slurm": {
+      "-J": "run",
+      "-N": 1
+    },
     "python_environment": "???",
     "work_directory": ".",
     "run_work_directory": ".",
@@ -18,12 +20,11 @@ default_auto_sbatch_conf = {
 
 
 class SBatch:
-    def __init__(self, sbatch_params=None, experiment_handler: ExperimentHandler = None):
+    def __init__(self, slurm_params=None, sbatch_params=None, experiment_handler: ExperimentHandler = None):
         self.experiment_handler = experiment_handler
         self.slurm_script = "#!/bin/sh"
-        self._params = OmegaConf.create(sbatch_params)
-        self._available_slurm_commands = ["-J", "-N", "-n", "-o", "-e", "--gres", "--mem",
-                                          "--time", "--mail-user", "--mail-type", "--array"]
+        self._slurm_params = OmegaConf.create(slurm_params if slurm_params is not None else dict())
+        self._params = OmegaConf.create(sbatch_params if sbatch_params is not None else dict())
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
                                "--grid-search", "run_registry_path"]
         self._commands: List[Command] = []
@@ -69,22 +70,22 @@ class SBatch:
             self.add_command(command)
 
     def make_slurm_script(self):
+        dot_params_slurm = walk_dict(self._slurm_params)
         dot_params = walk_dict(self._params)
         script_name = self._params[
             "--run-script"] if "--run-script" in self._params else self.experiment_handler.script_location.name
 
-        for key, value in dot_params.items():
-            if key in self._available_slurm_commands:
-                if key[:2] == "--":
-                    self.slurm_script += f"\n#SBATCH {key}={value}"
-                elif key[:1] == "-":
-                    self.slurm_script += f"\n#SBATCH {key} {value}"
+        for key, value in dot_params_slurm.items():
+            if key[:2] == "--":
+                self.slurm_script += f"\n#SBATCH {key}={value}"
+            elif key[:1] == "-":
+                self.slurm_script += f"\n#SBATCH {key} {value}"
         self.slurm_script += "\n"
         for command in self._commands:
             self.slurm_script += f"\n{command.get()}"
 
         for key, value in walk_dict(dot_params).items():
-            if key not in self._available_slurm_commands and key not in self._reserved_args:
+            if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
                         key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
                     key_var = key.replace(".", "").replace("/", "")
@@ -94,7 +95,7 @@ class SBatch:
 
         self.slurm_script += f'\npython "{script_name}" "gpus={self.get_num_gpus()}"'
         for key, value in walk_dict(dot_params).items():
-            if key not in self._available_slurm_commands and key not in self._reserved_args:
+            if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
                         key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
                     key_var = key.replace(".", "").replace("/", "")
@@ -110,6 +111,7 @@ class SBatch:
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
+        # (out, err) = b"", b""
         print("Running generated SLURM script:")
         print(self.slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
@@ -147,9 +149,9 @@ def get_grid_combinations(args):
     return n_jobs, OmegaConf.merge(args, new_values)
 
 
-def auto_sbatch(arg_config=None, handler=None):
-    SBatch(arg_config, handler)()
-    run("test")
+def auto_sbatch(slurm_config=None, arg_config=None, handler=None):
+    SBatch(slurm_config, arg_config, handler)()
+
 
 def main(arg_config=None):
     conf = OmegaConf.create(default_auto_sbatch_conf)
@@ -158,6 +160,8 @@ def main(arg_config=None):
         conf = OmegaConf.merge(conf, arg_config)
     cli_args = OmegaConf.from_cli()
     conf = OmegaConf.merge(conf, cli_args)
+    slurm_conf = conf.slurm
+    del conf.slurm
 
     handler = None
     if "python_environment" in conf:
@@ -167,7 +171,7 @@ def main(arg_config=None):
             conf.run_work_directory,
             conf.script_location
         )
-    auto_sbatch(conf, handler)
+    auto_sbatch(slurm_conf, conf, handler)
 
 
 if __name__ == '__main__':

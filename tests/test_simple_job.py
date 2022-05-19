@@ -1,8 +1,9 @@
+from auto_sbatch import auto_sbatch
+from auto_sbatch.sbatch import main
 from .utils import mock_processes
 
 
 def test_start_simple_batch(mock_processes, capsys):
-    from auto_sbatch import auto_sbatch
     auto_sbatch({
         "--run-script": "main.py",
         "-J": "job-name",
@@ -22,3 +23,6 @@ Mocked communication output
 Mocked communication error
 """
 
+
+def test_cli():
+    main()

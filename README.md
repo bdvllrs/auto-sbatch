@@ -23,10 +23,11 @@ It works by generating a SLURM script on the fly and passing it to sbatch.
 from auto_sbatch import auto_sbatch
 
 auto_sbatch({
-    "--run-script": "main.py",
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00"
+}, {
+    "--run-script": "main.py",
 })
 ```
 
@@ -36,10 +37,11 @@ auto_sbatch({
 from auto_sbatch import SBatch
 
 sbatch = SBatch({
-    "--run-script": "main.py",
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00",
+},{
+    "--run-script": "main.py",
     "script-param": 7  # this will be given when the script is run as `python main.py "script-param=7"`
 })
 
@@ -49,13 +51,13 @@ sbatch()  # Will add experiment to queue
 ## CLI
 
 ```bash
-auto-sbatch "-J=job-name" "-N=1" "--run-script=main.py"
+auto-sbatch "slurm.'-J'=job-name" "slurm.'-N'=1" "--run-script=main.py"
 ```
 
 ## Grid-Search
 Add a `--grid-search` parameter with a list of the parameter to build the grid-search over.
 ```bash
-auto-sbatch "-J=job-name" "-N=1" "--run-script=main.py" "--grid-search=['param1', 'param2']" "param1=[0, 1]" "param2=[0, 1]"
+auto-sbatch "slurm.'-J'=job-name" "slurm.'-N'=1" "--run-script=main.py" "--grid-search=['param1', 'param2']" "param1=[0, 1]" "param2=[0, 1]"
 ```
 
 Here, it will start a slurm array of 4 jobs where `param1` and `param2` will have all combinations: (0, 0), (0, 1), (1, 0), (1, 1).
@@ -102,11 +104,10 @@ handler = ExperimentHandler(
 )
 
 sbatch = SBatch({
-    # --run-script is not required here, it will be provided by the handler.
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00"
-}, handler)
+}, {}, handler)
 
 # By default, a script is added to the commands in the SLURM script. You can add other commands that will
 # be executed before.

@@ -23,3 +23,4 @@ def run(command):
     if isinstance(command, list):
         command = Command(" ".join(command))
     subprocess.run(command.get(), shell=True)
+    # print(command.get())
