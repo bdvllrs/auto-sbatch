@@ -38,20 +38,20 @@ class SBatch:
             self.add_commands(self.experiment_handler.new_run())
 
     def set_grid_search(self):
-        if "--grid-search" in self._params and "--array" not in self._params:
+        if "--grid-search" in self._params and "--array" not in self._slurm_params:
             print("Detected Grid-Search, adding --array=auto option for you.")
-            self._params["--array"] = "auto"
+            self._slurm_params["--array"] = "auto"
 
-        if "--array" in self._params:
+        if "--array" in self._slurm_params:
             n_jobs = None
             if "--grid-search" in self._params:
                 n_jobs, self._params = get_grid_combinations(self._params)
-            if self._params["--array"] == "auto":
+            if self._slurm_params["--array"] == "auto":
                 assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
-                self._params["--array"] = f"0-{n_jobs - 1}"
+                self._slurm_params["--array"] = f"0-{n_jobs - 1}"
 
                 if n_jobs == 1:
-                    del self._params["--array"]
+                    del self._slurm_params["--array"]
 
     def get_num_gpus(self):
         if '--gres' in self._slurm_params:
