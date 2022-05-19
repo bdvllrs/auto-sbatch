@@ -93,7 +93,7 @@ class SBatch:
 
         self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params else "0")
 
-        self.slurm_script += f'\npython "{script_name}" "gpus={self.get_num_gpus()}"'
+        self.slurm_script += f'\npython "{script_name}" "devices={self.get_num_gpus()}"'
         for key, value in walk_dict(dot_params).items():
             if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
