@@ -54,8 +54,8 @@ class SBatch:
                     del self._params["--array"]
 
     def get_num_gpus(self):
-        if '--gres' in self._params:
-            s = self._params['--gres'].split(":")
+        if '--gres' in self._slurm_params:
+            s = self._slurm_params['--gres'].split(":")
             if len(s) > 1:
                 return int(s[1])
         return 0
