@@ -35,8 +35,9 @@ class ExperimentHandler:
 
     def source_environment(self):
         if self.python_environment is not None:
-            run(["echo", "Activate environment ${envName}"])
-            run(["source", str(self.python_environment / "bin/activate")])
+            environment = str(self.python_environment / "bin/activate")
+            run(["echo", f"Activate environment {environment}"])
+            run(["source", environment])
 
     def setup_experiment(self):
         if (self.work_directory / "setup.py").exists():
