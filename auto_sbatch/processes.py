@@ -12,7 +12,7 @@ class Command:
         return self.command
 
     def format(self, *args, **kwargs):
-        return self.command.format(*args, **kwargs)
+        self.command = self.command.format(*args, **kwargs)
 
 
 class Python(Command):

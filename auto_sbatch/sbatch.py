@@ -126,7 +126,7 @@ class SBatch:
             "checkpoints_dir": "../../checkpoints/$jobId"
         }
 
-        run_command = run_command.format(**run_command_args)
+        run_command.format(**run_command_args)
         self.slurm_script += f"\n{run_command.get()}"
 
     def __call__(self, run_command):
