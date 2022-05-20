@@ -15,7 +15,8 @@ default_auto_sbatch_conf = {
     "python_environment": "???",
     "work_directory": ".",
     "run_work_directory": ".",
-    "script_location": "???"
+    "script_location": "???",
+    "run_command": 'python "{script_name}" "num_gpus={num_gpus}" {all_params} "checkpoints_dir=\'{checkpoints_dir}\'"'
 }
 
 
@@ -60,6 +61,27 @@ class SBatch:
                 return int(s[1])
         return 0
 
+    def get_run_params(self):
+        params = {
+            "params": "",
+            "grid_search": "",
+            "all": ""
+        }
+        dot_params = walk_dict(self._params)
+        for key, value in dot_params.items():
+            if key not in self._reserved_args:
+                if ("--grid-search" in dot_params and
+                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
+                    key_var = key.replace(".", "").replace("/", "")
+                    s = ' "' + key + '=${' + key_var + 'Param[$taskId]}"'
+                    params["grid_search"] += s
+                    params["all"] += s
+                else:
+                    s = f' "{key}={value}"'
+                    params["params"] += s
+                    params["all"] += s
+        return params
+
     def add_command(self, command):
         if not isinstance(command, Command):
             command = Command(command)
@@ -69,7 +91,8 @@ class SBatch:
         for command in commands:
             self.add_command(command)
 
-    def make_slurm_script(self):
+    def make_slurm_script(self, run_command):
+        run_command = Command(run_command)
         dot_params_slurm = walk_dict(self._slurm_params)
         dot_params = walk_dict(self._params)
         script_name = self._params[
@@ -93,19 +116,21 @@ class SBatch:
 
         self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params else "0")
 
-        self.slurm_script += f'\npython "{script_name}" "devices={self.get_num_gpus()}"'
-        for key, value in walk_dict(dot_params).items():
-            if key not in self._reserved_args:
-                if ("--grid-search" in dot_params and
-                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
-                    key_var = key.replace(".", "").replace("/", "")
-                    self.slurm_script += ' "' + key + '=${' + key_var + 'Param[$taskId]}"'
-                else:
-                    self.slurm_script += f' "{key}={value}"'
-        self.slurm_script += ' "checkpoints_dir=\'../../checkpoints/$jobId\'"'
+        run_command_params = self.get_run_params()
+        run_command_args = {
+            "script_name": script_name,
+            "num_gpus": self.get_num_gpus(),
+            "params": run_command_params["params"],
+            "grid_search_params": run_command_params["grid_search"],
+            "all_params": run_command_params["all"],
+            "checkpoints_dir": "../../checkpoints/$jobId"
+        }
 
-    def __call__(self):
-        self.make_slurm_script()
+        run_command = run_command.format(**run_command_args)
+        self.slurm_script += f"\n{run_command.get()}"
+
+    def __call__(self, run_command):
+        self.make_slurm_script(run_command)
         process = subprocess.Popen(["sbatch"],
                                    stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE,
@@ -149,8 +174,8 @@ def get_grid_combinations(args):
     return n_jobs, OmegaConf.merge(args, new_values)
 
 
-def auto_sbatch(slurm_config=None, arg_config=None, handler=None):
-    SBatch(slurm_config, arg_config, handler)()
+def auto_sbatch(run_command, slurm_config=None, arg_config=None, handler=None):
+    SBatch(slurm_config, arg_config, handler)(run_command)
 
 
 def main(arg_config=None):
@@ -161,7 +186,9 @@ def main(arg_config=None):
     cli_args = OmegaConf.from_cli()
     conf = OmegaConf.merge(conf, cli_args)
     slurm_conf = conf.slurm
+    run_command = conf.run_command
     del conf.slurm
+    del conf.run_command
 
     handler = None
     if "python_environment" in conf:
@@ -171,7 +198,7 @@ def main(arg_config=None):
             conf.run_work_directory,
             conf.script_location
         )
-    auto_sbatch(slurm_conf, conf, handler)
+    auto_sbatch(run_command, slurm_conf, conf, handler)
 
 
 if __name__ == '__main__':

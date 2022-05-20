@@ -22,7 +22,9 @@ It works by generating a SLURM script on the fly and passing it to sbatch.
 ```python
 from auto_sbatch import auto_sbatch
 
-auto_sbatch({
+# Main command that will be run
+run_command = "python {script_name} {all_params}"
+auto_sbatch(run_command, {
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00"
@@ -45,13 +47,19 @@ sbatch = SBatch({
     "script-param": 7  # this will be given when the script is run as `python main.py "script-param=7"`
 })
 
-sbatch()  # Will add experiment to queue
+run_command = "python {script_name} {all_params}"
+sbatch(run_command)  # Will add experiment to queue
 ```
 
 ## CLI
 
 ```bash
-auto-sbatch "slurm.'-J'=job-name" "slurm.'-N'=1" "--run-script=main.py"
+auto-sbatch "slurm.'-J'=job-name" "slurm.'-N'=1" "--run-script=main.py" "run_command='python {script_name} {all_params}'"
+```
+
+Default `run_command` if not provided is:
+```
+python "{script_name}" "num_gpus={num_gpus}" {all_params} "checkpoints_dir='{checkpoints_dir}'"
 ```
 
 ## Grid-Search
@@ -113,6 +121,14 @@ sbatch = SBatch({
 # be executed before.
 sbatch.add_command("echo $SLURM_JOB_ID")
 
-sbatch()  # batch the experiment!
+sbatch("python {script_name} {all_params}")  # batch the experiment!
 ```
+
+### Available shortcuts for `run_command`
+- `{script_name}` path to script
+- `{params}` provided params, excluding `{grid_search_params}`
+- `{grid_search_params}` parameters computed by grid_search
+- `{all_params}` combines `{params}` and `{grid_search_params}`
+- `{checkpoints_dir}` location to the checkpoint directory.
+- `{num_gpus}` number of requested gpus to slurm.
 

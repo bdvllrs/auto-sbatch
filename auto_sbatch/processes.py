@@ -11,6 +11,9 @@ class Command:
     def get(self):
         return self.command
 
+    def format(self, *args, **kwargs):
+        return self.command.format(*args, **kwargs)
+
 
 class Python(Command):
     def get(self):
