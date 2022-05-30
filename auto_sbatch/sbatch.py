@@ -65,7 +65,8 @@ class SBatch:
         params = {
             "params": "",
             "grid_search": "",
-            "all": ""
+            "all": "",
+            "grid_search_string": []
         }
         dot_params = walk_dict(self._params)
         for key, value in dot_params.items():
@@ -76,10 +77,12 @@ class SBatch:
                     s = ' "' + key + '=${' + key_var + 'Param[$taskId]}"'
                     params["grid_search"] += s
                     params["all"] += s
+                    params["grid_search_string"].append(key + '-${' + key_var + 'Param[$taskId]}')
                 else:
                     s = f' "{key}={value}"'
                     params["params"] += s
                     params["all"] += s
+        params["grid_search_string"] = "_".join(params["grid_search_string"])
         return params
 
     def add_command(self, command):
@@ -122,6 +125,7 @@ class SBatch:
             "num_gpus": self.get_num_gpus(),
             "params": run_command_params["params"],
             "grid_search_params": run_command_params["grid_search"],
+            "grid_search_string": run_command_params["grid_search_string"],
             "all_params": run_command_params["all"],
             "checkpoints_dir": "../../checkpoints/$jobId"
         }
