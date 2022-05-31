@@ -117,7 +117,7 @@ class SBatch:
                     key_var = key.replace(".", "").replace("/", "")
                     self.slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
 
-        self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params else "0")
+        self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params_slurm else "0")
 
         run_command_params = self.get_run_params()
         run_command_args = {
