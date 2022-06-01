@@ -38,6 +38,10 @@ class SBatch:
         if self.experiment_handler is not None:
             self.add_commands(self.experiment_handler.new_run())
 
+    @property
+    def num_available_jobs(self):
+        return self._n_job_seq
+
     def set_grid_search(self):
         n_jobs = None
         if "--grid-search" in self._params:
@@ -143,21 +147,25 @@ class SBatch:
 
         return slurm_script
 
-    def __call__(self, run_command, task_id=None):
-        slurm_script = self.make_slurm_script(run_command, task_id)
-        process = subprocess.Popen(["sbatch"],
-                                   stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-        (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
-        # (out, err) = b"", b""
-        print("Running generated SLURM script:")
-        print(slurm_script)
-        out, err = bytes.decode(out), bytes.decode(err)
-        if len(out):
-            print(out)
-        if len(err):
-            print(err)
+    def __call__(self, run_command, task_id=None, start_all_tasks=False):
+        task_ids = [task_id]
+        if start_all_tasks and "--array" not in self._slurm_params:
+            task_ids = list(range(self._n_job_seq))
+        for task_id in task_ids:
+            slurm_script = self.make_slurm_script(run_command, task_id)
+            process = subprocess.Popen(["sbatch"],
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+            (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+            # (out, err) = b"", b""
+            print("Running generated SLURM script:")
+            print(slurm_script)
+            out, err = bytes.decode(out), bytes.decode(err)
+            if len(out):
+                print(out)
+            if len(err):
+                print(err)
 
 
 def walk_dict(d, prefix=[], cond=None):
