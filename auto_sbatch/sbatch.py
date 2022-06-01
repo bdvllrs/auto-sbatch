@@ -23,12 +23,12 @@ default_auto_sbatch_conf = {
 class SBatch:
     def __init__(self, slurm_params=None, sbatch_params=None, experiment_handler: ExperimentHandler = None):
         self.experiment_handler = experiment_handler
-        self.slurm_script = "#!/bin/sh"
         self._slurm_params = OmegaConf.create(slurm_params if slurm_params is not None else dict())
         self._params = OmegaConf.create(sbatch_params if sbatch_params is not None else dict())
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
                                "--grid-search", "run_registry_path"]
         self._commands: List[Command] = []
+        self._n_job_seq = 1
 
         self.set_grid_search()
 
@@ -39,20 +39,16 @@ class SBatch:
             self.add_commands(self.experiment_handler.new_run())
 
     def set_grid_search(self):
-        if "--grid-search" in self._params and "--array" not in self._slurm_params:
-            print("Detected Grid-Search, adding --array=auto option for you.")
-            self._slurm_params["--array"] = "auto"
+        n_jobs = None
+        if "--grid-search" in self._params:
+            n_jobs, self._params = get_grid_combinations(self._params)
+            self._n_job_seq = n_jobs
+        if self._slurm_params["--array"] == "auto":
+            assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
+            self._slurm_params["--array"] = f"0-{n_jobs - 1}"
 
-        if "--array" in self._slurm_params:
-            n_jobs = None
-            if "--grid-search" in self._params:
-                n_jobs, self._params = get_grid_combinations(self._params)
-            if self._slurm_params["--array"] == "auto":
-                assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
-                self._slurm_params["--array"] = f"0-{n_jobs - 1}"
-
-                if n_jobs == 1:
-                    del self._slurm_params["--array"]
+            if n_jobs == 1:
+                del self._slurm_params["--array"]
 
     def get_num_gpus(self):
         if '--gres' in self._slurm_params:
@@ -94,30 +90,39 @@ class SBatch:
         for command in commands:
             self.add_command(command)
 
-    def make_slurm_script(self, run_command):
+    def make_slurm_script(self, run_command, task_id=None):
         run_command = Command(run_command)
         dot_params_slurm = walk_dict(self._slurm_params)
         dot_params = walk_dict(self._params)
         script_name = self._params[
             "--run-script"] if "--run-script" in self._params else self.experiment_handler.script_location.name
 
+        slurm_script = "#!/bin/sh"
+
         for key, value in dot_params_slurm.items():
             if key[:2] == "--":
-                self.slurm_script += f"\n#SBATCH {key}={value}"
+                slurm_script += f"\n#SBATCH {key}={value}"
             elif key[:1] == "-":
-                self.slurm_script += f"\n#SBATCH {key} {value}"
-        self.slurm_script += "\n"
+                slurm_script += f"\n#SBATCH {key} {value}"
+        slurm_script += "\n"
         for command in self._commands:
-            self.slurm_script += f"\n{command.get()}"
+            slurm_script += f"\n{command.get()}"
 
         for key, value in walk_dict(dot_params).items():
             if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
                         key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
                     key_var = key.replace(".", "").replace("/", "")
-                    self.slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
+                    slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
 
-        self.slurm_script += f'\ntaskId=' + ("$SLURM_ARRAY_TASK_ID" if '--array' in dot_params_slurm else "0")
+        if '--array' in dot_params_slurm:
+            slurm_script += f'\ntaskId=$SLURM_ARRAY_TASK_ID"'
+        elif task_id is not None:
+            slurm_script += f'\ntaskId={task_id}'
+        elif self._n_job_seq > 1:
+            slurm_script += f'\nfor taskId in $(seq 0 {self._n_job_seq - 1})\ndo'
+        else:
+            slurm_script += f'\ntaskId=0'
 
         run_command_params = self.get_run_params()
         run_command_args = {
@@ -131,18 +136,23 @@ class SBatch:
         }
 
         run_command.format(**run_command_args)
-        self.slurm_script += f"\n{run_command.get()}"
+        slurm_script += f"\n{run_command.get()}"
 
-    def __call__(self, run_command):
-        self.make_slurm_script(run_command)
+        if self._n_job_seq > 1 and task_id is None:
+            slurm_script += f'\ndone'
+
+        return slurm_script
+
+    def __call__(self, run_command, task_id=None):
+        slurm_script = self.make_slurm_script(run_command, task_id)
         process = subprocess.Popen(["sbatch"],
                                    stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
-        (out, err) = process.communicate(bytes(self.slurm_script, 'utf-8'))
+        (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
         # (out, err) = b"", b""
         print("Running generated SLURM script:")
-        print(self.slurm_script)
+        print(slurm_script)
         out, err = bytes.decode(out), bytes.decode(err)
         if len(out):
             print(out)
