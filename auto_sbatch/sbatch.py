@@ -47,7 +47,7 @@ class SBatch:
         if "--grid-search" in self._params:
             n_jobs, self._params = get_grid_combinations(self._params)
             self._n_job_seq = n_jobs
-        if self._slurm_params["--array"] == "auto":
+        if "--array" in self._slurm_params and self._slurm_params["--array"] == "auto":
             assert n_jobs is not None, "Cannot have --array=auto when no grid-search is set."
             self._slurm_params["--array"] = f"0-{n_jobs - 1}"
 
