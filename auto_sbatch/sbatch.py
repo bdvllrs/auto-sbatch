@@ -42,6 +42,19 @@ class SBatch:
     def num_available_jobs(self):
         return self._n_job_seq
 
+    def get_task_params(self, task_id=0):
+        dot_params = walk_dict(self._params)
+        params = {}
+        for key, value in walk_dict(dot_params).items():
+            if key not in self._reserved_args:
+                if ("--grid-search" in dot_params and
+                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
+                    key_var = key.replace(".", "").replace("/", "")
+                    params[key_var] = value[task_id]
+                else:
+                    params[key] = value
+        return params
+
     def set_grid_search(self):
         n_jobs = None
         if "--grid-search" in self._params:
