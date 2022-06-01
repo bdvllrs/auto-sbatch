@@ -147,9 +147,9 @@ class SBatch:
 
         return slurm_script
 
-    def __call__(self, run_command, task_id=None, start_all_tasks=False):
+    def __call__(self, run_command, task_id=None, schedule_all_tasks=False):
         task_ids = [task_id]
-        if start_all_tasks and "--array" not in self._slurm_params:
+        if schedule_all_tasks and "--array" not in self._slurm_params:
             task_ids = list(range(self._n_job_seq))
         for task_id in task_ids:
             slurm_script = self.make_slurm_script(run_command, task_id)
