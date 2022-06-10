@@ -12,12 +12,15 @@ class ExperimentHandler:
                  run_registry_path=None,
                  pre_modules=None,
                  run_modules=None,
-                 additional_scripts=None):
+                 additional_scripts=None,
+                 setup_experiment=True):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
         self.work_directory = Path(work_directory)
         self.python_environment = Path(python_environment) if python_environment is not None else None
         self.run_registry_path = Path(run_registry_path) if run_registry_path is not None else None
+
+        self._setup_experiment = setup_experiment
 
         if not (self.work_directory / self.script_location).exists():
             raise ValueError(f"Script file does not exist. "
@@ -40,12 +43,13 @@ class ExperimentHandler:
             run(["source", environment])
 
     def setup_experiment(self):
-        if (self.work_directory / "setup.py").exists():
-            run(["pip", "install", "-e", str(self.work_directory)])
-        elif (self.work_directory / "requirements.txt").exists():
-            run(["pip", "install", "-r", str(self.work_directory / "requirements.txt")])
-        if (self.work_directory / "offline_setup.py").exists():
-            run(["python", str(self.work_directory / "offline_setup")])
+        if self._setup_experiment:
+            if (self.work_directory / "setup.py").exists():
+                run(["pip", "install", "-e", str(self.work_directory)])
+            elif (self.work_directory / "requirements.txt").exists():
+                run(["pip", "install", "-r", str(self.work_directory / "requirements.txt")])
+            if (self.work_directory / "offline_setup.py").exists():
+                run(["python", str(self.work_directory / "offline_setup")])
 
     def new_run(self):
         self.source_environment()
