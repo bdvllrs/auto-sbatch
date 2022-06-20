@@ -1,5 +1,6 @@
 import subprocess
 from itertools import product
+from pathlib import Path
 from typing import List
 
 from omegaconf import OmegaConf, DictConfig, ListConfig
@@ -9,8 +10,8 @@ from auto_sbatch.processes import Command
 
 default_auto_sbatch_conf = {
     "slurm": {
-      "-J": "run",
-      "-N": 1
+        "-J": "run",
+        "-N": 1
     },
     "python_environment": "???",
     "work_directory": ".",
@@ -179,6 +180,20 @@ class SBatch:
                 print(out)
             if len(err):
                 print(err)
+
+    def save_slurm_script(self, path_location, run_command, task_id=None, schedule_all_tasks=False):
+        path_location = Path(path_location)
+        task_ids = [task_id]
+        if schedule_all_tasks and "--array" not in self._slurm_params:
+            task_ids = list(range(self._n_job_seq))
+        for task_id in task_ids:
+            slurm_script = self.make_slurm_script(run_command, task_id)
+            if task_id is not None:
+                location = path_location.with_name(path_location.name + "_" + task_id)
+            else:
+                location = path_location
+            with open(location, "w") as f:
+                f.write(slurm_script)
 
 
 def walk_dict(d, prefix=[], cond=None):
