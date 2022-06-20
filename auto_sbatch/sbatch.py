@@ -27,7 +27,8 @@ class SBatch:
         self._slurm_params = OmegaConf.create(slurm_params if slurm_params is not None else dict())
         self._params = OmegaConf.create(sbatch_params if sbatch_params is not None else dict())
         self._reserved_args = ["python_environment", "work_directory", "run_work_directory", "script_location",
-                               "--grid-search", "run_registry_path"]
+                               "--grid-search", "run_registry_path", "run_modules", "command",
+                               "additional_scripts", "pre_modules"]
         self._commands: List[Command] = []
         self._n_job_seq = 1
 
