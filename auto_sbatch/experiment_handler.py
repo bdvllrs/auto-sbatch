@@ -54,8 +54,9 @@ class ExperimentHandler:
     def new_run(self):
         self.source_environment()
         self.load_modules()
-        for additional_install in self.additional_script:
-            run(additional_install)
+        if self.additional_script is not None:
+            for additional_install in self.additional_script:
+                run(additional_install)
         self.setup_experiment()
 
         # add_run_location = Path(__file__).parent / "register_run.py"
