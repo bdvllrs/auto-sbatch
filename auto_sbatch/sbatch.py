@@ -161,39 +161,32 @@ class SBatch:
 
         return slurm_script
 
-    def __call__(self, run_command, task_id=None, schedule_all_tasks=False):
+    def __call__(self, run_command, task_id=None, schedule_all_tasks=False, save_script=None, run_script=True):
         task_ids = [task_id]
         if schedule_all_tasks and "--array" not in self._slurm_params:
             task_ids = list(range(self._n_job_seq))
         for task_id in task_ids:
             slurm_script = self.make_slurm_script(run_command, task_id)
-            process = subprocess.Popen(["sbatch"],
-                                       stdin=subprocess.PIPE,
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE)
-            (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
-            # (out, err) = b"", b""
-            print("Running generated SLURM script:")
-            print(slurm_script)
-            out, err = bytes.decode(out), bytes.decode(err)
-            if len(out):
-                print(out)
-            if len(err):
-                print(err)
-
-    def save_slurm_script(self, path_location, run_command, task_id=None, schedule_all_tasks=False):
-        path_location = Path(path_location)
-        task_ids = [task_id]
-        if schedule_all_tasks and "--array" not in self._slurm_params:
-            task_ids = list(range(self._n_job_seq))
-        for task_id in task_ids:
-            slurm_script = self.make_slurm_script(run_command, task_id)
-            if task_id is not None:
-                location = path_location.with_name(path_location.name + "_" + task_id)
-            else:
-                location = path_location
-            with open(location, "w") as f:
-                f.write(slurm_script)
+            if save_script is not None:
+                path_location = Path(save_script)
+                if task_id is not None:
+                    path_location = path_location.with_name(path_location.name + "_" + task_id)
+                with open(path_location, "w") as f:
+                    f.write(slurm_script)
+            if run_script:
+                process = subprocess.Popen(["sbatch"],
+                                           stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE)
+                (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+                # (out, err) = b"", b""
+                print("Running generated SLURM script:")
+                print(slurm_script)
+                out, err = bytes.decode(out), bytes.decode(err)
+                if len(out):
+                    print(out)
+                if len(err):
+                    print(err)
 
 
 def walk_dict(d, prefix=[], cond=None):
