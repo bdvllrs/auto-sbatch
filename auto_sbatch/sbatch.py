@@ -135,7 +135,7 @@ class SBatch:
                     slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
 
         if '--array' in dot_params_slurm:
-            slurm_script += f'\ntaskId=$SLURM_ARRAY_TASK_ID"'
+            slurm_script += f'\ntaskId=$SLURM_ARRAY_TASK_ID'
         elif task_id is not None:
             slurm_script += f'\ntaskId={task_id}'
         elif self._n_job_seq > 1:
