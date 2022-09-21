@@ -157,7 +157,7 @@ class SBatch:
         run_command.format(**run_command_args)
         slurm_script += f"\n{run_command.get()}"
 
-        if self._n_job_seq > 1 and task_id is None:
+        if self._n_job_seq > 1 and task_id is None and '--array' not in dot_params_slurm:
             slurm_script += f'\ndone'
 
         return slurm_script
@@ -175,6 +175,8 @@ class SBatch:
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             if run_script:
+                with open("__slurm_script.sh", "w") as f:
+                    f.write(slurm_script)
                 process = subprocess.Popen(["sbatch"],
                                            stdin=subprocess.PIPE,
                                            stdout=subprocess.PIPE,
