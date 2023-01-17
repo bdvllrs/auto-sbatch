@@ -125,8 +125,6 @@ work_directory = Path(__file__).absolute().parent
 run_work_directory = "/path/to/experiments"
 # Path to a potential python environment.
 python_environment = "/path/to/python/env"
-# File where a csv of all run are stored. Not created if not given.
-run_registry_path = "~/run_registry.csv"
 # modules to load BEFORE script are batched
 pre_modules = ["python/3.8.5"]
 # modules to load in the batch system
@@ -141,7 +139,6 @@ handler = ExperimentHandler(
     work_directory,
     run_work_directory,
     python_environment,
-    run_registry_path,
     pre_modules,
     run_modules,
     additional_scripts

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from auto_sbatch.processes import run, Command
+from auto_sbatch.processes import run
 
 
 class ExperimentHandler:
@@ -9,7 +9,6 @@ class ExperimentHandler:
                  work_directory=".",
                  run_work_directory=".",
                  python_environment=None,
-                 run_registry_path=None,
                  pre_modules=None,
                  run_modules=None,
                  additional_scripts=None,
@@ -18,7 +17,6 @@ class ExperimentHandler:
         self.run_work_directory = Path(run_work_directory)
         self.work_directory = Path(work_directory)
         self.python_environment = Path(python_environment) if python_environment is not None else None
-        self.run_registry_path = Path(run_registry_path) if run_registry_path is not None else None
 
         self._setup_experiment = setup_experiment
 
@@ -79,9 +77,4 @@ class ExperimentHandler:
             commands.extend([
                 f'source "{str(self.python_environment)}/bin/activate"'
             ])
-        if self.run_registry_path is not None:
-            commands.append(
-                f'register-run registry={str(self.run_registry_path.absolute())} '
-                f'job_id=$jobId status="started" location="$runWorkdirJob/{self.work_directory.absolute().name}/{str(self.script_location)}"',
-            )
         return commands
