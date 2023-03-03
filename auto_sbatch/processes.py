@@ -4,7 +4,7 @@ import subprocess
 class Command:
     def __init__(self, command):
         if isinstance(command, Command):
-            command = command.command
+            command = command.get()
         assert isinstance(command, str)
         self.command = command
 
@@ -26,4 +26,3 @@ def run(command):
     if isinstance(command, list):
         command = Command(" ".join(command))
     subprocess.run(command.get(), shell=True)
-    # print(command.get())
