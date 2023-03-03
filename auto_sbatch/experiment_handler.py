@@ -12,13 +12,15 @@ class ExperimentHandler:
                  pre_modules=None,
                  run_modules=None,
                  additional_scripts=None,
-                 setup_experiment=True):
+                 setup_experiment=True,
+                 use_conda=False):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
         self.work_directory = Path(work_directory)
-        self.python_environment = Path(python_environment) if python_environment is not None else None
+        self.python_environment = python_environment
 
         self._setup_experiment = setup_experiment
+        self._use_conda = use_conda
 
         if not (self.work_directory / self.script_location).exists():
             raise ValueError(f"Script file does not exist. "
@@ -34,11 +36,17 @@ class ExperimentHandler:
         for module in self.pre_modules:
             run(["module", "load", module])
 
+    def _get_environment(self):
+        if self.python_environment is not None and self._use_conda:
+            return f"conda activate {self.python_environment}"
+        elif self.python_environment is not None:
+            return f"source {self.python_environment / 'bin/activate'}"
+        return ""
+
     def source_environment(self):
         if self.python_environment is not None:
-            environment = str(self.python_environment / "bin/activate")
-            run(["echo", f"Activate environment {environment}"])
-            run(["source", environment])
+            run(["echo", f"Activate environment {str(self.python_environment)}"])
+            run(self._get_environment())
 
     def setup_experiment(self):
         if self._setup_experiment:
@@ -57,7 +65,6 @@ class ExperimentHandler:
                 run(additional_install)
         self.setup_experiment()
 
-        # add_run_location = Path(__file__).parent / "register_run.py"
         commands = [
             "jobId=$SLURM_JOB_ID",
             f"runWorkdirJob={str(self.run_work_directory)}/$jobId",
@@ -65,16 +72,15 @@ class ExperimentHandler:
 
         commands.extend([
             'mkdir -p "$runWorkdirJob"',
-            'mkdir "$runWorkdirJob/logs"',
             'mkdir "$runWorkdirJob/checkpoints"',
 
             f'cp -r {str(self.work_directory)} $runWorkdirJob',
-            f'cd "$runWorkdirJob/{self.work_directory.absolute().name}/{str(self.script_location.parent)}"',
+            f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/{str(self.script_location.parent)}"',
             'module purge'
         ])
         commands.extend([f'module load {module}' for module in self.run_modules])
         if self.python_environment is not None:
             commands.extend([
-                f'source "{str(self.python_environment)}/bin/activate"'
+                self._get_environment(),
             ])
         return commands
