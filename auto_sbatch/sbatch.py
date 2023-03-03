@@ -17,7 +17,7 @@ default_auto_sbatch_conf = {
     "work_directory": ".",
     "run_work_directory": ".",
     "script_location": "???",
-    "run_command": 'python "{script_name}" "num_gpus={num_gpus}" {all_params} "checkpoints_dir=\'{checkpoints_dir}\'"'
+    "run_command": 'python "{script_name}" "num_gpus={num_gpus}" {all_params}'
 }
 
 
@@ -31,6 +31,7 @@ class SBatch:
                                "additional_scripts", "pre_modules"]
         self._commands: List[Command] = []
         self._n_job_seq = 1
+        self._main_command_args = {}
 
         self.set_grid_search()
 
@@ -39,6 +40,7 @@ class SBatch:
 
         if self.experiment_handler is not None:
             self.add_commands(self.experiment_handler.new_run())
+            self._main_command_args.update(self.experiment_handler.get_main_command_args())
 
     @property
     def num_available_jobs(self):
@@ -84,15 +86,16 @@ class SBatch:
             "grid_search_string": []
         }
         dot_params = walk_dict(self._params)
+        param_end = "Param[$taskId]" if "--array" in self._slurm_params else "Param"
         for key, value in dot_params.items():
             if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
                         key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
                     key_var = key.replace(".", "").replace("/", "")
-                    s = ' "' + key + '=${' + key_var + 'Param[$taskId]}"'
+                    s = ' "' + key + '=${' + key_var + param_end + '}"'
                     params["grid_search"] += s
                     params["all"] += s
-                    params["grid_search_string"].append(key + '=${' + key_var + 'Param[$taskId]}')
+                    params["grid_search_string"].append(key + '=${' + key_var + param_end + '}')
                 else:
                     s = f' "{key}={value}"'
                     params["params"] += s
@@ -109,7 +112,7 @@ class SBatch:
         for command in commands:
             self.add_command(command)
 
-    def make_slurm_script(self, run_command, task_id=None):
+    def make_slurm_script(self, run_command, task_id=None, main_command_args=None):
         run_command = Command(run_command)
         dot_params_slurm = walk_dict(self._slurm_params)
         dot_params = walk_dict(self._params)
@@ -127,20 +130,24 @@ class SBatch:
         for command in self._commands:
             slurm_script += f"\n{command.get()}"
 
-        for key, value in walk_dict(dot_params).items():
+        for key, param_values in walk_dict(dot_params).items():
             if key not in self._reserved_args:
                 if ("--grid-search" in dot_params and
-                        key in dot_params["--grid-search"] and isinstance(value, ListConfig)):
+                        key in dot_params["--grid-search"] and
+                        isinstance(param_values, ListConfig) and
+                        '--array' not in dot_params_slurm and task_id is not None):
                     key_var = key.replace(".", "").replace("/", "")
-                    slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, value)) + '")'
+                    slurm_script += f"\n{key_var}Param={param_values[task_id]}"
+                elif ("--grid-search" in dot_params and
+                        key in dot_params["--grid-search"] and isinstance(param_values, ListConfig)):
+                    key_var = key.replace(".", "").replace("/", "")
+                    slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, param_values)) + '")'
 
         if '--array' in dot_params_slurm:
             slurm_script += f'\ntaskId=$SLURM_ARRAY_TASK_ID'
-        elif task_id is not None:
-            slurm_script += f'\ntaskId={task_id}'
-        elif self._n_job_seq > 1:
+        elif task_id is None and self._n_job_seq > 1:
             slurm_script += f'\nfor taskId in $(seq 0 {self._n_job_seq - 1})\ndo'
-        else:
+        elif task_id is None:
             slurm_script += f'\ntaskId=0'
 
         run_command_params = self.get_run_params()
@@ -151,8 +158,9 @@ class SBatch:
             "grid_search_params": run_command_params["grid_search"],
             "grid_search_string": run_command_params["grid_search_string"],
             "all_params": run_command_params["all"],
-            "checkpoints_dir": "../../checkpoints/$jobId"
         }
+        run_command_args.update(self._main_command_args)
+        run_command_args.update(main_command_args or {})
 
         run_command.format(**run_command_args)
         slurm_script += f"\n{run_command.get()}"
@@ -162,12 +170,13 @@ class SBatch:
 
         return slurm_script
 
-    def __call__(self, run_command, task_id=None, schedule_all_tasks=False, save_script=None, run_script=True):
+    def __call__(self, run_command, task_id=None, schedule_all_tasks=False, save_script=None,
+            run_script=True, main_command_args=None):
         task_ids = [task_id]
         if schedule_all_tasks and "--array" not in self._slurm_params:
             task_ids = list(range(self._n_job_seq))
         for task_id in task_ids:
-            slurm_script = self.make_slurm_script(run_command, task_id)
+            slurm_script = self.make_slurm_script(run_command, task_id, main_command_args)
             if save_script is not None:
                 path_location = Path(save_script)
                 if task_id is not None:
@@ -175,12 +184,12 @@ class SBatch:
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             if run_script:
-                process = subprocess.Popen(["sbatch"],
-                                           stdin=subprocess.PIPE,
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE)
-                (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
-                # (out, err) = b"", b""
+                # process = subprocess.Popen(["sbatch"],
+                #                            stdin=subprocess.PIPE,
+                #                            stdout=subprocess.PIPE,
+                #                            stderr=subprocess.PIPE)
+                # (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+                (out, err) = b"", b""
                 print("Running generated SLURM script:")
                 print(slurm_script)
                 out, err = bytes.decode(out), bytes.decode(err)
