@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from auto_sbatch.processes import run
@@ -13,14 +14,13 @@ class ExperimentHandler:
                  run_modules=None,
                  additional_scripts=None,
                  setup_experiment=True,
-                 use_conda=False):
+    ):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
         self.work_directory = Path(work_directory)
         self.python_environment = python_environment
 
         self._setup_experiment = setup_experiment
-        self._use_conda = use_conda
 
         if not (self.work_directory / self.script_location).exists():
             raise ValueError(f"Script file does not exist. "
@@ -37,10 +37,12 @@ class ExperimentHandler:
             run(["module", "load", module])
 
     def _get_environment(self):
-        if self.python_environment is not None and self._use_conda:
-            return f"conda activate {self.python_environment}"
-        elif self.python_environment is not None:
-            return f"source {self.python_environment / 'bin/activate'}"
+        if self.python_environment is not None:
+            env_path = Path(self.python_environment) / "bin/activate"
+            if env_path.is_dir():
+                return f"source {env_path.resolve()}"
+            else:
+                return f"conda activate {self.python_environment}"
         return ""
 
     def source_environment(self):
