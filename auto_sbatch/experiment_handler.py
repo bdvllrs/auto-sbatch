@@ -26,8 +26,8 @@ class ExperimentHandler:
             raise ValueError(f"Script file does not exist. "
                              f"You are trying to run {self.work_directory / self.script_location}.")
 
-        self.pre_modules = pre_modules
-        self.run_modules = run_modules
+        self.pre_modules = pre_modules or []
+        self.run_modules = run_modules or []
 
         self.additional_script = additional_scripts
 
@@ -39,7 +39,7 @@ class ExperimentHandler:
     def _get_environment(self):
         if self.python_environment is not None:
             env_path = Path(self.python_environment) / "bin/activate"
-            if env_path.is_dir():
+            if env_path.exists():
                 return f"source {env_path.resolve()}"
             else:
                 return f"conda activate {self.python_environment}"
@@ -86,3 +86,8 @@ class ExperimentHandler:
                 self._get_environment(),
             ])
         return commands
+
+    def get_main_command_args(self):
+        return {
+            "checkpoints_dir": "../../checkpoints/$jobId"
+        }
