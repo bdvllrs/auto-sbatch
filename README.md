@@ -163,6 +163,7 @@ sbatch("python {script_name} {all_params}")  # batch the experiment!
 - `{grid_search_params}` parameters computed by grid_search as parameter format
 - `{grid_search_string}` parameters computed by grid_search in a string form
 - `{all_params}` combines `{params}` and `{grid_search_params}`
-- `{checkpoints_dir}` location to the checkpoint directory.
 - `{num_gpus}` number of requested gpus to slurm.
 
+When using the experiment handler:
+- `{checkpoints_dir}` location to the checkpoint directory.
