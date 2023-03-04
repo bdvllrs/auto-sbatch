@@ -14,6 +14,7 @@ class ExperimentHandler:
                  run_modules=None,
                  additional_scripts=None,
                  setup_experiment=True,
+                 exclude_in_rsync=None,
     ):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
@@ -21,6 +22,7 @@ class ExperimentHandler:
         self.python_environment = python_environment
 
         self._setup_experiment = setup_experiment
+        self._exclude_in_rsync = exclude_in_rsync
 
         if not (self.work_directory / self.script_location).exists():
             raise ValueError(f"Script file does not exist. "
@@ -72,11 +74,17 @@ class ExperimentHandler:
             f"runWorkdirJob={str(self.run_work_directory)}/$jobId",
         ]
 
+        excluded_folders = [".git", ".idea", "__pycache__"]
+        if self._exclude_in_rsync is not None:
+            excluded_folders.extend(self._exclude_in_rsync)
+
+        excluded_command = " ".join([f"--exclude={folder}" for folder in excluded_folders])
+
         commands.extend([
             'mkdir -p "$runWorkdirJob"',
             'mkdir "$runWorkdirJob/checkpoints"',
 
-            f'rsync -a {str(self.work_directory)} $runWorkdirJob --exclude .git --exclude .idea --exclude __pycache__',
+            f'rsync -a {str(self.work_directory)} $runWorkdirJob {excluded_command}',
             f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/{str(self.script_location.parent)}"',
             'module purge'
         ])
