@@ -76,7 +76,7 @@ class ExperimentHandler:
             'mkdir -p "$runWorkdirJob"',
             'mkdir "$runWorkdirJob/checkpoints"',
 
-            f'cp -r {str(self.work_directory)} $runWorkdirJob',
+            f'rsync -a {str(self.work_directory)} $runWorkdirJob --exclude .git --exclude .idea --exclude __pycache__',
             f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/{str(self.script_location.parent)}"',
             'module purge'
         ])
