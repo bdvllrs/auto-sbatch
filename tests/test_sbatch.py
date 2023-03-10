@@ -1,18 +1,20 @@
 from pathlib import Path
-from .utils import mock_processes
-from auto_sbatch import SBatch, ExperimentHandler
+
+from auto_sbatch import ExperimentHandler, SBatch
 
 
 def test_sbatch(mock_processes, capsys):
-    sbatch = SBatch({
-        "--run-script": "main.py",
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00",
-        "script-param": 7  # this will be given when the script is run as `python main.py "script-param=7"`
-    })
+    sbatch = SBatch(
+        {
+            "-J": "job-name",
+            "-N": 1,
+            "--time": "01:00:00"
+        },
+        {"script_param": 7},  # this will be given when the script is run as `python main.py "script_param=7"`
+        run_script="main.py"
+    )
 
-    sbatch()  # Will add experiment to queue
+    sbatch("python {script_name} {all_params}")  # Will add experiment to queue
 
 
 def test_handled_sbatch(mock_processes, capsys):
@@ -27,8 +29,6 @@ def test_handled_sbatch(mock_processes, capsys):
     run_work_directory = "."
     # Path to a potential python environment.
     python_environment = None
-    # File where a csv of all run are stored. Not created if not given.
-    run_registry_path = None
     # modules to load BEFORE script are batched
     pre_modules = ["python/3.8.5"]
     # modules to load in the batch system
@@ -43,18 +43,19 @@ def test_handled_sbatch(mock_processes, capsys):
         work_directory,
         run_work_directory,
         python_environment,
-        run_registry_path,
         pre_modules,
         run_modules,
         additional_scripts
     )
 
-    sbatch = SBatch({
-        "--run-script": "main.py",
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00",
-        "script-param": 7  # this will be given when the script is run as `python main.py "script-param=7"`
-    }, handler)
+    sbatch = SBatch(
+        {
+            "-J": "job-name",
+            "-N": 1,
+            "--time": "01:00:00",
+        },
+        {"script_param": 7},  # this will be given when the script is run as `python main.py "script-param=7"`
+        run_script="main.py", experiment_handler=handler
+    )
 
-    sbatch()  # Will add experiment to queue
+    sbatch("python {script_name} {all_params}")  # Will add experiment to queue

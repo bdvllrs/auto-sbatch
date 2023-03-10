@@ -28,9 +28,7 @@ auto_sbatch(run_command, {
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00"
-}, {
-    "--run-script": "main.py",
-})
+}, run_script="main.py")
 ```
 
 ### `SBatch` class
@@ -43,27 +41,15 @@ sbatch = SBatch({
     "-N": 1,
     "--time": "01:00:00",
 },{
-    "--run-script": "main.py",
-    "script-param": 7  # this will be given when the script is run as `python main.py "script-param=7"`
-})
+    "script_param": 7  # this will be given when the script is run as `python main.py "script_param=7"`
+}, run_script="main.py")
 
 run_command = "python {script_name} {all_params}"
 sbatch(run_command)  # Will add experiment to queue
 ```
 
-## CLI
-
-```bash
-auto-sbatch "slurm.'-J'=job-name" "slurm.'-N'=1" "--run-script=main.py" "run_command='python {script_name} {all_params}'"
-```
-
-Default `run_command` if not provided is:
-```
-python "{script_name}" "num_gpus={num_gpus}" {all_params} "checkpoints_dir='{checkpoints_dir}'"
-```
-
 ## Grid-Search
-Add a `--grid-search` parameter with a list of the parameter to build the grid-search over.
+Add a `grid_search` parameter with a list of the parameter to build the grid-search over.
 ```python
 from auto_sbatch import SBatch
 
@@ -73,11 +59,9 @@ sbatch = SBatch({
     "--time": "01:00:00",
     "--array": "auto"  # this will be automatically changed to the number of generated jobs.
 },{
-    "--run-script": "main.py",
-    "--grid-search": ["param1", "param2"],
     "param1": [0, 1],
     "param2": [0, 1],
-})
+}, grid_search=["param1", "param2"], run_script="main.py")
 
 run_command = "python {script_name} {all_params}"
 sbatch(run_command)
@@ -115,7 +99,7 @@ from pathlib import Path
 from auto_sbatch import SBatch, ExperimentHandler
 
 # path to the script to start from the work_directory
-# replaces the --run-script
+# replaces the run_script
 script_location = "main.py"
 # The work directory will be copied into an experiment folder. This allows reproducibility
 # when looking at the code used for the experiment later.
@@ -148,7 +132,7 @@ sbatch = SBatch({
     "-J": "job-name",
     "-N": 1,
     "--time": "01:00:00"
-}, {}, handler)
+}, experiment_handler=handler)
 
 # By default, a script is added to the commands in the SLURM script. You can add other commands that will
 # be executed before.

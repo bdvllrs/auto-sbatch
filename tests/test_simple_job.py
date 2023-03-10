@@ -4,11 +4,13 @@ from .utils import mock_processes
 
 
 def test_start_simple_batch(mock_processes, capsys):
-    auto_sbatch({
-        "--run-script": "main.py",
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
+    auto_sbatch("python {script_name} {all_params}", {
+        "run_script": "main.py",
+        "slurm": {
+            "-J": "job-name",
+            "-N": 1,
+            "--time": "01:00:00"
+        }
     })
     captured = capsys.readouterr()
     assert captured.out == """Running generated SLURM script:
