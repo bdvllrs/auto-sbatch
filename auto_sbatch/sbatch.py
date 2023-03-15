@@ -79,17 +79,20 @@ class SBatch:
             "grid_search_string": []
         }
         dot_params = walk_dict(self._params)
-        param_end = "Param[$taskId]" if "--array" in self._slurm_params else "Param"
+        param_end = "_param"
+        if "--array" in self._slurm_params:
+            param_end += "[$taskId]"
         for key, value in dot_params.items():
             if (self._grid_search is not None and
                     key in self._grid_search and isinstance(value, ListConfig)):
-                key_var = key.replace(".", "").replace("/", "")
+                key_var = key.replace(".", "_").replace("/", "_")
                 s = ' "' + key + '=${' + key_var + param_end + '}"'
                 params["grid_search"] += s
                 params["all"] += s
                 params["grid_search_string"].append(key + '=${' + key_var + param_end + '}')
             else:
-                s = f' "{key}={value}"'
+                escaped_value = str(value).replace('"', '\\"')
+                s = f' "{key}={escaped_value}"'
                 params["params"] += s
                 params["all"] += s
         params["grid_search_string"] = "_".join(params["grid_search_string"])
@@ -126,12 +129,12 @@ class SBatch:
                     key in self._grid_search and
                     isinstance(param_values, ListConfig) and
                     '--array' not in dot_params_slurm and task_id is not None):
-                key_var = key.replace(".", "").replace("/", "")
-                slurm_script += f"\n{key_var}Param={param_values[task_id]}"
+                key_var = key.replace(".", "_").replace("/", "_")
+                slurm_script += f"\n{key_var}_param={param_values[task_id]}"
             elif (self._grid_search is not None and
                   key in self._grid_search and isinstance(param_values, ListConfig)):
-                key_var = key.replace(".", "").replace("/", "")
-                slurm_script += '\n' + key_var + 'Param=("' + '" "'.join(map(str, param_values)) + '")'
+                key_var = key.replace(".", "_").replace("/", "_")
+                slurm_script += '\n' + key_var + '_param=("' + '" "'.join(map(str, param_values)) + '")'
 
         if '--array' in dot_params_slurm:
             slurm_script += f'\ntaskId=$SLURM_ARRAY_TASK_ID'
@@ -176,14 +179,15 @@ class SBatch:
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             if run_script:
-                process = subprocess.Popen(
-                    ["sbatch"],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-                (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+                # process = subprocess.Popen(
+                #     ["sbatch"],
+                #     stdin=subprocess.PIPE,
+                #     stdout=subprocess.PIPE,
+                #     stderr=subprocess.PIPE
+                # )
+                # (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
                 print(slurm_script)
+                return
                 out, err = bytes.decode(out), bytes.decode(err)
                 if len(out):
                     print(out)
