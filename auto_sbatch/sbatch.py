@@ -57,9 +57,9 @@ class SBatch:
         )
 
     def get_task_params(self, task_id=0):
-        dot_params = walk_dict(self._params)
+        dot_params = get_dotlist_params(self._params)
         params = {}
-        for key, value in walk_dict(dot_params).items():
+        for key, value in get_dotlist_params(dot_params).items():
             if self._is_grid_search_key(key, value):
                 key_var = key.replace(".", "").replace("/", "")
                 params[key_var] = value[task_id]
@@ -93,29 +93,33 @@ class SBatch:
 
     def get_run_params(self):
         params = {
-            "params": "",
-            "grid_search": "",
-            "all": "",
+            "params": [],
+            "grid_search": [],
+            "all": [],
             "grid_search_string": []
         }
-        dot_params = walk_dict(self._params)
+        dot_params = get_dotlist_params(self._params)
         param_end = "_param"
         if "--array" in self._slurm_params:
             param_end += "[$taskId]"
         for key, value in dot_params.items():
             if self._is_grid_search_key(key, value):
                 key_var = key.replace(".", "_").replace("/", "_")
-                s = ' "' + key + '=${' + key_var + param_end + '}"'
-                params["grid_search"] += s
-                params["all"] += s
+                s = '"' + key + '=${' + key_var + param_end + '}"'
+                params["grid_search"].append(s)
+                params["all"].append(s)
                 params["grid_search_string"].append(
                     key + '=${' + key_var + param_end + '}'
                 )
             else:
-                escaped_value = str(value).replace('"', '\\"')
-                s = f' "{key}={escaped_value}"'
-                params["params"] += s
-                params["all"] += s
+                escaped_value = get_arg_value(value)
+                s = f'"{key}={escaped_value}"'
+                params["params"].append(s)
+                params["all"].append(s)
+
+        params["params"] = " ".join(params["params"])
+        params["grid_search"] = " ".join(params["grid_search"])
+        params["all"] = " ".join(params["all"])
         params["grid_search_string"] = "_".join(params["grid_search_string"])
         return params
 
@@ -132,8 +136,8 @@ class SBatch:
             self, run_command, task_id=None, main_command_args=None
     ):
         run_command = Command(run_command)
-        dot_params_slurm = walk_dict(self._slurm_params)
-        dot_params = walk_dict(self._params)
+        dot_params_slurm = get_dotlist_params(self._slurm_params)
+        dot_params = get_dotlist_params(self._params)
         script_name = self._run_script
         if self._run_script is None:
             script_name = self._experiment_handler.script_location.name
@@ -149,16 +153,17 @@ class SBatch:
         for command in self._commands:
             slurm_script += f"\n{command.get()}"
 
-        for key, param_values in walk_dict(dot_params).items():
+        for key, param_values in dot_params.items():
             if (self._is_grid_search_key(key, param_values)
                     and '--array' not in dot_params_slurm
                     and task_id is not None):
                 key_var = key.replace(".", "_").replace("/", "_")
-                slurm_script += f"\n{key_var}_param={param_values[task_id]}"
+                formatted_value = get_arg_value(param_values[task_id])
+                slurm_script += f"\n{key_var}_param={formatted_value}"
             elif self._is_grid_search_key(key, param_values):
                 key_var = key.replace(".", "_").replace("/", "_")
                 slurm_script += '\n' + key_var + '_param=("' + '" "'.join(
-                    map(str, param_values)
+                    map(get_arg_value, param_values)
                 ) + '")'
 
         if '--array' in dot_params_slurm:
@@ -229,24 +234,34 @@ class SBatch:
                     print(err)
 
 
-def walk_dict(d, prefix=[], cond=None):
-    new_dic = {}
-    if d is not None:
-        for key, val in d.items():
-            if type(val) is DictConfig:
-                new_dic.update(walk_dict(val, prefix + [key], cond))
-            else:
-                dotted_key = ".".join(prefix + [key])
-                if cond is None or cond(dotted_key, val):
-                    new_dic[dotted_key] = val
-    return new_dic
+def get_arg_value(value):
+    if value is None:
+        return "null"
+    return str(value).replace('"', '\\"')
+
+
+def get_dotlist_params(cfg, cond=None):
+    dotlist = {}
+
+    def gather(_cfg):
+        if isinstance(_cfg, ListConfig):
+            raise ValueError("ListConfig not supported as first container.")
+        for key in _cfg:
+            dotlist_key = _cfg._get_full_key(key)  # noqa
+            if isinstance(_cfg[key], DictConfig):
+                gather(_cfg[key])
+            elif cond is None or cond(dotlist_key, _cfg[key]):
+                dotlist[dotlist_key] = _cfg[key]
+
+    gather(cfg)
+    return dotlist
 
 
 def get_grid_combinations(args, grid_search):
     def cond(key, val):
         return key in grid_search and isinstance(val, ListConfig)
 
-    unstructured_dict = walk_dict(args, cond=cond)
+    unstructured_dict = get_dotlist_params(args, cond=cond)
 
     keys, values = zip(*unstructured_dict.items())
     all_combinations = list(product(*values))
