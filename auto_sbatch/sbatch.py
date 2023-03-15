@@ -179,15 +179,14 @@ class SBatch:
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             if run_script:
-                # process = subprocess.Popen(
-                #     ["sbatch"],
-                #     stdin=subprocess.PIPE,
-                #     stdout=subprocess.PIPE,
-                #     stderr=subprocess.PIPE
-                # )
-                # (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+                process = subprocess.Popen(
+                    ["sbatch"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
                 print(slurm_script)
-                return
                 out, err = bytes.decode(out), bytes.decode(err)
                 if len(out):
                     print(out)
