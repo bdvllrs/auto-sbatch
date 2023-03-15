@@ -24,11 +24,13 @@ from auto_sbatch import auto_sbatch
 
 # Main command that will be run
 run_command = "python {script_name} {all_params}"
-auto_sbatch(run_command, {
-    "-J": "job-name",
-    "-N": 1,
-    "--time": "01:00:00"
-}, run_script="main.py")
+auto_sbatch(
+    run_command, {
+        "-J": "job-name",
+        "-N": 1,
+        "--time": "01:00:00"
+    }, run_script="main.py"
+)
 ```
 
 ### `SBatch` class
@@ -49,30 +51,40 @@ sbatch(run_command)  # Will add experiment to queue
 ```
 
 ## Grid-Search
-Add a `grid_search` parameter with a list of the parameter to build the grid-search over.
+
+Add a `grid_search` parameter with a list of the parameter to build the
+grid-search over.
+
 ```python
 from auto_sbatch import SBatch
 
-sbatch = SBatch({
-    "-J": "job-name",
-    "-N": 1,
-    "--time": "01:00:00",
-    "--array": "auto"  # this will be automatically changed to the number of generated jobs.
-},{
-    "param1": [0, 1],
-    "param2": [0, 1],
-}, grid_search=["param1", "param2"], run_script="main.py")
+sbatch = SBatch(
+    {
+        "-J": "job-name",
+        "-N": 1,
+        "--time": "01:00:00",
+        "--array": "auto"
+        # this will be automatically changed to the number of generated jobs.
+    }, {
+        "param1": [0, 1],
+        "param2": [0, 1],
+    }, grid_search=["param1", "param2"], run_script="main.py"
+)
 
 run_command = "python {script_name} {all_params}"
 sbatch(run_command)
 ```
 
-Here, it will prepare and start 4 jobs where `param1` and `param2` will have all combinations: (0, 0), (0, 1), (1, 0), (1, 1).
+Here, it will prepare and start 4 jobs where `param1` and `param2` will have
+all combinations: (0, 0), (0, 1), (1, 0), (1, 1).
 
 A grid search can be executed in several manners:
-- if "--array" is provided as a slurm argument, it will be dispatched as a slurm array.
-- if "--array" is not provided, it will create only 1 SLURM job and run the jobs sequentially. Be careful to adapt the
-length of the job to accommodate all runs. 
+
+- if "--array" is provided as a slurm argument, it will be dispatched as a
+  slurm array.
+- if "--array" is not provided, it will create only 1 SLURM job and run the
+  jobs sequentially. Be careful to adapt the
+  length of the job to accommodate all runs.
 
 If you want to manage the tasks yourself, you can set the `task_id` parameter:
 
@@ -92,7 +104,8 @@ sbatch(run_command, schedule_all_tasks=True)  # will schedule everything
 
 ## ExperimentHandler
 
-`auto-sbatch` can do a little more than normal sbatch by setting up an experiment folder.
+`auto-sbatch` can do a little more than normal sbatch by setting up an
+experiment folder.
 
 ```python
 from pathlib import Path
@@ -128,11 +141,13 @@ handler = ExperimentHandler(
     additional_scripts
 )
 
-sbatch = SBatch({
-    "-J": "job-name",
-    "-N": 1,
-    "--time": "01:00:00"
-}, experiment_handler=handler)
+sbatch = SBatch(
+    {
+        "-J": "job-name",
+        "-N": 1,
+        "--time": "01:00:00"
+    }, experiment_handler=handler
+)
 
 # By default, a script is added to the commands in the SLURM script. You can add other commands that will
 # be executed before.
@@ -142,6 +157,7 @@ sbatch("python {script_name} {all_params}")  # batch the experiment!
 ```
 
 ### Available shortcuts for `run_command`
+
 - `{script_name}` path to script
 - `{params}` provided params, excluding `{grid_search_params}`
 - `{grid_search_params}` parameters computed by grid_search as parameter format
@@ -150,4 +166,5 @@ sbatch("python {script_name} {all_params}")  # batch the experiment!
 - `{num_gpus}` number of requested gpus to slurm.
 
 When using the experiment handler:
+
 - `{checkpoints_dir}` location to the checkpoint directory.

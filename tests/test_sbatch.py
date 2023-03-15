@@ -1,25 +1,14 @@
+import unittest.mock as mock
 from pathlib import Path
 
-from tests.utils import mock_run
-
 from auto_sbatch import ExperimentHandler, SBatch
-import unittest.mock as mock
-
-
-def mock_for_tests(p_open, subprocess):
-    subprocess_instance = mock.MagicMock()
-    subprocess_instance.run.side_effect = mock_run
-    subprocess.return_value = subprocess_instance
-    p_open_instance = mock.MagicMock()
-    p_open_instance.communicate.return_value = b"Mocked communication output", b"Mocked communication error"
-    p_open.return_value = p_open_instance
-
+from tests.utils import mock_for_tests
 
 
 @mock.patch("auto_sbatch.processes.subprocess")
 @mock.patch("auto_sbatch.sbatch.Popen")
 def test_sbatch(p_open, subprocess, capsys):
-    mock_for_tests(p_open, subprocess)
+    mock_for_tests(p_open=p_open, subprocess=subprocess)
 
     sbatch = SBatch(
         {
@@ -27,7 +16,9 @@ def test_sbatch(p_open, subprocess, capsys):
             "-N": 1,
             "--time": "01:00:00"
         },
-        {"script_param": 7},  # this will be given when the script is run as `python main.py "script_param=7"`
+        {"script_param": 7},
+        # this will be given when the script is run as `python main.py
+        # "script_param=7"`
         run_script="main.py"
     )
 
@@ -37,12 +28,13 @@ def test_sbatch(p_open, subprocess, capsys):
 @mock.patch("auto_sbatch.processes.subprocess")
 @mock.patch("auto_sbatch.sbatch.Popen")
 def test_handled_sbatch(p_open, subprocess, capsys):
-    mock_for_tests(p_open, subprocess)
+    mock_for_tests(p_open=p_open, subprocess=subprocess)
 
     # path to the script to start from the work_directory
     # replaces the --run-script
     script_location = "test_sbatch.py"
-    # The work directory will be copied into an experiment folder. This allows reproducibility
+    # The work directory will be copied into an experiment folder. This
+    # allows reproducibility
     # when looking at the code used for the experiment later.
     # Here, we assume the script is at the root of the work directory
     work_directory = Path(__file__).absolute().parent
@@ -75,7 +67,9 @@ def test_handled_sbatch(p_open, subprocess, capsys):
             "-N": 1,
             "--time": "01:00:00",
         },
-        {"script_param": 7},  # this will be given when the script is run as `python main.py "script-param=7"`
+        {"script_param": 7},
+        # this will be given when the script is run as `python main.py
+        # "script-param=7"`
         run_script="main.py", experiment_handler=handler
     )
 

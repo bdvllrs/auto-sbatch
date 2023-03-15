@@ -1,20 +1,20 @@
-import os
 from pathlib import Path
 
 from auto_sbatch.processes import run
 
 
 class ExperimentHandler:
-    def __init__(self,
-                 script_location,
-                 work_directory=".",
-                 run_work_directory=".",
-                 python_environment=None,
-                 pre_modules=None,
-                 run_modules=None,
-                 additional_scripts=None,
-                 setup_experiment=True,
-                 exclude_in_rsync=None,
+    def __init__(
+            self,
+            script_location,
+            work_directory=".",
+            run_work_directory=".",
+            python_environment=None,
+            pre_modules=None,
+            run_modules=None,
+            additional_scripts=None,
+            setup_experiment=True,
+            exclude_in_rsync=None,
     ):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
@@ -25,8 +25,11 @@ class ExperimentHandler:
         self._exclude_in_rsync = exclude_in_rsync
 
         if not (self.work_directory / self.script_location).exists():
-            raise ValueError(f"Script file does not exist. "
-                             f"You are trying to run {self.work_directory / self.script_location}.")
+            raise ValueError(
+                f"Script file does not exist. "
+                f"You are trying to run "
+                f"{self.work_directory / self.script_location}."
+            )
 
         self.pre_modules = pre_modules or []
         self.run_modules = run_modules or []
@@ -49,7 +52,10 @@ class ExperimentHandler:
 
     def source_environment(self):
         if self.python_environment is not None:
-            run(["echo", f"Activate environment {str(self.python_environment)}"])
+            run(
+                ["echo",
+                 f"Activate environment {str(self.python_environment)}"]
+            )
             run(self._get_environment())
 
     def setup_experiment(self):
@@ -57,7 +63,10 @@ class ExperimentHandler:
             if (self.work_directory / "setup.py").exists():
                 run(["pip", "install", "-e", str(self.work_directory)])
             elif (self.work_directory / "requirements.txt").exists():
-                run(["pip", "install", "-r", str(self.work_directory / "requirements.txt")])
+                run(
+                    ["pip", "install", "-r",
+                     str(self.work_directory / "requirements.txt")]
+                )
             if (self.work_directory / "offline_setup.py").exists():
                 run(["python", str(self.work_directory / "offline_setup")])
 
@@ -78,24 +87,35 @@ class ExperimentHandler:
         if self._exclude_in_rsync is not None:
             excluded_folders.extend(self._exclude_in_rsync)
 
-        excluded_command = " ".join([f"--exclude={folder}" for folder in excluded_folders])
+        excluded_command = " ".join(
+            [f"--exclude={folder}" for folder in excluded_folders]
+        )
 
-        commands.extend([
-            'mkdir -p "$runWorkdirJob"',
-            'mkdir "$runWorkdirJob/checkpoints"',
+        commands.extend(
+            [
+                'mkdir -p "$runWorkdirJob"',
+                'mkdir "$runWorkdirJob/checkpoints"',
 
-            f'rsync -a {str(self.work_directory)} $runWorkdirJob {excluded_command}',
-            f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/{str(self.script_location.parent)}"',
-            'module purge'
-        ])
-        commands.extend([f'module load {module}' for module in self.run_modules])
+                f'rsync -a {str(self.work_directory)} $runWorkdirJob '
+                f'{excluded_command}',
+                f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/'
+                f'{str(self.script_location.parent)}"',
+                'module purge'
+            ]
+        )
+        commands.extend(
+            [f'module load {module}' for module in self.run_modules]
+        )
         if self.python_environment is not None:
-            commands.extend([
-                self._get_environment(),
-            ])
+            commands.extend(
+                [
+                    self._get_environment(),
+                ]
+            )
         return commands
 
-    def get_main_command_args(self):
+    @staticmethod
+    def get_main_command_args():
         return {
             "checkpoints_dir": "../../checkpoints/$jobId"
         }
