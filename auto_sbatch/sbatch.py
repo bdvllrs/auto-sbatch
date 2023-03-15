@@ -1,6 +1,6 @@
-import subprocess
 from itertools import product
 from pathlib import Path
+from subprocess import PIPE, Popen
 from typing import List
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
@@ -179,11 +179,11 @@ class SBatch:
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             if run_script:
-                process = subprocess.Popen(
+                process = Popen(
                     ["sbatch"],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
+                    stdin=PIPE,
+                    stdout=PIPE,
+                    stderr=PIPE
                 )
                 (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
                 print(slurm_script)

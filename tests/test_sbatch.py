@@ -1,9 +1,26 @@
 from pathlib import Path
 
+from tests.utils import mock_run
+
 from auto_sbatch import ExperimentHandler, SBatch
+import unittest.mock as mock
 
 
-def test_sbatch(mock_processes, capsys):
+def mock_for_tests(p_open, subprocess):
+    subprocess_instance = mock.MagicMock()
+    subprocess_instance.run.side_effect = mock_run
+    subprocess.return_value = subprocess_instance
+    p_open_instance = mock.MagicMock()
+    p_open_instance.communicate.return_value = b"Mocked communication output", b"Mocked communication error"
+    p_open.return_value = p_open_instance
+
+
+
+@mock.patch("auto_sbatch.processes.subprocess")
+@mock.patch("auto_sbatch.sbatch.Popen")
+def test_sbatch(p_open, subprocess, capsys):
+    mock_for_tests(p_open, subprocess)
+
     sbatch = SBatch(
         {
             "-J": "job-name",
@@ -17,7 +34,11 @@ def test_sbatch(mock_processes, capsys):
     sbatch("python {script_name} {all_params}")  # Will add experiment to queue
 
 
-def test_handled_sbatch(mock_processes, capsys):
+@mock.patch("auto_sbatch.processes.subprocess")
+@mock.patch("auto_sbatch.sbatch.Popen")
+def test_handled_sbatch(p_open, subprocess, capsys):
+    mock_for_tests(p_open, subprocess)
+
     # path to the script to start from the work_directory
     # replaces the --run-script
     script_location = "test_sbatch.py"
