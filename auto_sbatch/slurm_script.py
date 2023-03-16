@@ -19,12 +19,12 @@ class SlurmScriptParser:
 
     def _format_main_command(self):
         possible_formats = {
-            "script_name": "([^\s]*?)",
-            "num_gpus": "([^\s]*?)",
-            "params": "(.*)",
-            "grid_search_params": "(.*)",
-            "grid_search_string": "(.*)",
-            "all_params": "(.*)",
+            "script_name": r"([^\s]*?)",
+            "num_gpus": r"([^\s]*?)",
+            "params": r"(.*)",
+            "grid_search_params": r"(.*)",
+            "grid_search_string": r"(.*)",
+            "all_params": r"(.*)",
         }
         for key, val in possible_formats.items():
             self._main_command = self._main_command.replace(
