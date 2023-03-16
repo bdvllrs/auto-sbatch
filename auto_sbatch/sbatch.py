@@ -7,6 +7,7 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from auto_sbatch.experiment_handler import ExperimentHandler
 from auto_sbatch.processes import Command
+from auto_sbatch.slurm_script import SlurmScriptParser
 
 
 class SBatch:
@@ -22,6 +23,7 @@ class SBatch:
         self._slurm_params = OmegaConf.create(slurm_params or dict())
         self._params = OmegaConf.create(params or dict())
         self._commands: List[Command] = []
+        self._post_commands: List[Command] = []
         self._n_job_seq = 1
         self._main_command_args = {}
 
@@ -38,6 +40,18 @@ class SBatch:
             self._main_command_args.update(
                 self._experiment_handler.get_main_command_args()
             )
+
+    @staticmethod
+    def from_slurm_script(slurm_script: str, main_command: str):
+        parser = SlurmScriptParser(slurm_script, main_command)
+        parser.parse()
+        sbatch = SBatch(
+            parser.slurm_params, parser.params,
+            run_script=parser.run_script
+        )
+        sbatch.add_commands(parser.commands)
+        sbatch.add_commands(parser.post_commands, post=True)
+        return sbatch
 
     @property
     def num_available_jobs(self):
@@ -59,7 +73,7 @@ class SBatch:
     def get_task_params(self, task_id=0):
         dot_params = get_dotlist_params(self._params)
         params = {}
-        for key, value in get_dotlist_params(dot_params).items():
+        for key, value in dot_params.items():
             if self._is_grid_search_key(key, value):
                 key_var = key.replace(".", "").replace("/", "")
                 params[key_var] = value[task_id]
@@ -123,14 +137,17 @@ class SBatch:
         params["grid_search_string"] = "_".join(params["grid_search_string"])
         return params
 
-    def add_command(self, command):
+    def add_command(self, command, post=False):
         if not isinstance(command, Command):
             command = Command(command)
+        if post:
+            self._post_commands.append(command)
+            return
         self._commands.append(command)
 
-    def add_commands(self, commands):
+    def add_commands(self, commands, post=False):
         for command in commands:
-            self.add_command(command)
+            self.add_command(command, post)
 
     def make_slurm_script(
             self, run_command, task_id=None, main_command_args=None
@@ -195,6 +212,9 @@ class SBatch:
                 and '--array' not in dot_params_slurm
         ):
             slurm_script += '\ndone'
+
+        for command in self._post_commands:
+            slurm_script += f"\n{command.get()}"
 
         return slurm_script
 
