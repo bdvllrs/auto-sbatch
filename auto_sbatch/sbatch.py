@@ -15,7 +15,9 @@ class SBatch:
             self,
             slurm_params=None,
             params=None,
+            *,
             grid_search=None,
+            grid_search_exclude=None,
             run_script=None,
             experiment_handler: ExperimentHandler = None
     ):
@@ -28,6 +30,7 @@ class SBatch:
         self._main_command_args = {}
 
         self._grid_search = grid_search
+        self._grid_search_exclude = grid_search_exclude
         self._run_script = run_script
 
         self.set_grid_search()
@@ -85,7 +88,7 @@ class SBatch:
         n_jobs = None
         if self._grid_search is not None:
             n_jobs, self._params = get_grid_combinations(
-                self._params, self._grid_search
+                self._params, self._grid_search, self._grid_search_exclude
             )
             self._n_job_seq = n_jobs
         if self._is_slurm_array_auto():
@@ -277,7 +280,17 @@ def get_dotlist_params(cfg, cond=None):
     return dotlist
 
 
-def get_grid_combinations(args, grid_search):
+def is_excluded(keys, values, excluded):
+    for excluded_item in excluded:
+        for key, value in zip(keys, values):
+            if key in excluded_item.keys() and value != excluded_item[key]:
+                break
+        else:
+            return True
+    return False
+
+
+def get_grid_combinations(args, grid_search, exclude=None):
     def cond(key, val):
         return key in grid_search and isinstance(val, ListConfig)
 
@@ -285,6 +298,11 @@ def get_grid_combinations(args, grid_search):
 
     keys, values = zip(*unstructured_dict.items())
     all_combinations = list(product(*values))
+    if exclude is not None:
+        all_combinations = [
+            comb for comb in all_combinations
+            if not is_excluded(keys, comb, exclude)
+        ]
     n_jobs = len(all_combinations)
     new_dict = []
     for k, key in enumerate(keys):
@@ -303,11 +321,16 @@ def auto_sbatch(
         run_command,
         slurm_params=None,
         params=None,
+        *,
         grid_search=None,
+        grid_search_exclude=None,
         run_script=None,
         experiment_handler: ExperimentHandler = None
 ):
     SBatch(
-        slurm_params, params, grid_search,
-        run_script, experiment_handler
+        slurm_params, params,
+        grid_search=grid_search,
+        grid_search_exclude=grid_search_exclude,
+        run_script=run_script,
+        experiment_handler=experiment_handler
     )(run_command)

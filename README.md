@@ -24,12 +24,13 @@ from auto_sbatch import auto_sbatch
 
 # Main command that will be run
 run_command = "python {script_name} {all_params}"
+slurm_args = {
+    "-J": "job-name",
+    "-N": 1,
+    "--time": "01:00:00"
+}
 auto_sbatch(
-    run_command, {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
-    }, run_script="main.py"
+    run_command, slurm_args, run_script="main.py"
 )
 ```
 
@@ -38,13 +39,18 @@ auto_sbatch(
 ```python
 from auto_sbatch import SBatch
 
-sbatch = SBatch({
+slurm_args = {
     "-J": "job-name",
     "-N": 1,
-    "--time": "01:00:00",
-},{
-    "script_param": 7  # this will be given when the script is run as `python main.py "script_param=7"`
-}, run_script="main.py")
+    "--time": "01:00:00"
+}
+job_args = {
+    "script_param": 7
+    # this will be given when the script is run as `python main.py "script_param=7"`
+}
+sbatch = SBatch(
+    slurm_args, job_args, run_script="main.py"
+)
 
 run_command = "python {script_name} {all_params}"
 sbatch(run_command)  # Will add experiment to queue
@@ -58,17 +64,20 @@ grid-search over.
 ```python
 from auto_sbatch import SBatch
 
+slurm_args = {
+    "-J": "job-name",
+    "-N": 1,
+    "--time": "01:00:00",
+    "--array": "auto"
+    # this will be automatically changed to the number of generated jobs.
+}
+job_args = {
+    "param1": [0, 1],
+    "param2": [0, 1],
+}
 sbatch = SBatch(
-    {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00",
-        "--array": "auto"
-        # this will be automatically changed to the number of generated jobs.
-    }, {
-        "param1": [0, 1],
-        "param2": [0, 1],
-    }, grid_search=["param1", "param2"], run_script="main.py"
+    slurm_args, job_args,
+    grid_search=["param1", "param2"], run_script="main.py"
 )
 
 run_command = "python {script_name} {all_params}"
@@ -85,6 +94,37 @@ A grid search can be executed in several manners:
 - if "--array" is not provided, it will create only 1 SLURM job and run the
   jobs sequentially. Be careful to adapt the
   length of the job to accommodate all runs.
+
+You can exclude some combinations by providing the `grid_search_exclude`
+parameter.
+
+```python
+from auto_sbatch import SBatch
+
+slurm_args = {
+    "-J": "job-name",
+    "-N": 1,
+    "--time": "01:00:00",
+    "--array": "auto"
+    # this will be automatically changed to the number of generated jobs.
+}
+
+job_args = {
+    "param1": [0, 1],
+    "param2": [0, 1],
+}
+sbatch = SBatch(
+    slurm_args, job_args,
+    grid_search=["param1", "param2"],
+    grid_search_exclude=[{"param1": 0, "param2": 0}],  # excludes (0, 0)
+    run_script="main.py"
+)
+
+run_command = "python {script_name} {all_params}"
+sbatch(run_command)
+```
+
+will only run 3 jobs.
 
 If you want to manage the tasks yourself, you can set the `task_id` parameter:
 
@@ -141,12 +181,13 @@ handler = ExperimentHandler(
     additional_scripts
 )
 
+slurm_args = {
+    "-J": "job-name",
+    "-N": 1,
+    "--time": "01:00:00"
+}
 sbatch = SBatch(
-    {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
-    }, experiment_handler=handler
+    slurm_args, experiment_handler=handler
 )
 
 # By default, a script is added to the commands in the SLURM script. You can add other commands that will
