@@ -14,7 +14,7 @@ class SlurmScriptParser:
         self.commands = []
         self.post_commands = []
         self.main_command = None
-        self.run_script = None
+        self.script_name = None
         self.params = None
 
     def _format_main_command(self):
@@ -43,7 +43,7 @@ class SlurmScriptParser:
                 self.slurm_params[key] = val
             elif matches := re.match(main_command, line):
                 self.main_command = line
-                self.run_script = matches.group(1)
+                self.script_name = matches.group(1)
                 dotlist = matches.group(2).split(" ")
                 dotlist = [
                     match[1:-1] if match.startswith('"') else match

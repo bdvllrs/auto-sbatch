@@ -1,13 +1,14 @@
-from itertools import product
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import List
 
-from omegaconf import DictConfig, ListConfig, OmegaConf
+from omegaconf import ListConfig, OmegaConf
 
-from auto_sbatch.experiment_handler import ExperimentHandler
+from auto_sbatch import ExperimentHandler
+from auto_sbatch.grid_search import GridSearch
 from auto_sbatch.processes import Command
 from auto_sbatch.slurm_script import SlurmScriptParser
+from auto_sbatch.utils import get_dotlist_params
 
 
 class SBatch:
@@ -17,11 +18,9 @@ class SBatch:
             params=None,
             *,
             grid_search=None,
-            grid_search_exclude=None,
-            run_script=None,
-            experiment_handler: ExperimentHandler = None
+            script_name=None,
+            experiment_handler=None,
     ):
-        self._experiment_handler = experiment_handler
         self._slurm_params = OmegaConf.create(slurm_params or dict())
         self._params = OmegaConf.create(params or dict())
         self._commands: List[Command] = []
@@ -29,20 +28,21 @@ class SBatch:
         self._n_job_seq = 1
         self._main_command_args = {}
 
-        self._grid_search = grid_search
-        self._grid_search_exclude = grid_search_exclude
-        self._run_script = run_script
+        self._grid_search: GridSearch = grid_search
+        self._script_name = script_name
+
+        if experiment_handler is not None:
+            self.configure_from_experiment_handler(experiment_handler)
 
         self.set_grid_search()
 
-        if self._experiment_handler is None and self._run_script is None:
-            raise ValueError("Missing run_script param")
+    def configure_from_experiment_handler(self, handler: ExperimentHandler):
+        self.add_commands(handler.new_run())
+        self._main_command_args.update(handler.get_main_command_args())
+        self.set_script_name(handler.script_location)
 
-        if self._experiment_handler is not None:
-            self.add_commands(self._experiment_handler.new_run())
-            self._main_command_args.update(
-                self._experiment_handler.get_main_command_args()
-            )
+    def set_script_name(self, script_name):
+        self._script_name = script_name
 
     @staticmethod
     def from_slurm_script(slurm_script: str, main_command: str):
@@ -50,7 +50,7 @@ class SBatch:
         parser.parse()
         sbatch = SBatch(
             parser.slurm_params, parser.params,
-            run_script=parser.run_script
+            script_name=parser.script_name
         )
         sbatch.add_commands(parser.commands)
         sbatch.add_commands(parser.post_commands, post=True)
@@ -87,8 +87,8 @@ class SBatch:
     def set_grid_search(self):
         n_jobs = None
         if self._grid_search is not None:
-            n_jobs, self._params = get_grid_combinations(
-                self._params, self._grid_search, self._grid_search_exclude
+            n_jobs, self._params = self._grid_search.get_combinations(
+                self._params
             )
             self._n_job_seq = n_jobs
         if self._is_slurm_array_auto():
@@ -158,9 +158,7 @@ class SBatch:
         run_command = Command(run_command)
         dot_params_slurm = get_dotlist_params(self._slurm_params)
         dot_params = get_dotlist_params(self._params)
-        script_name = self._run_script
-        if self._run_script is None:
-            script_name = self._experiment_handler.script_location.name
+        script_name = self._script_name
 
         slurm_script = "#!/bin/sh"
 
@@ -221,10 +219,9 @@ class SBatch:
 
         return slurm_script
 
-    def __call__(
+    def run(
             self, run_command, task_id=None, schedule_all_tasks=False,
-            save_script=None,
-            run_script=True, main_command_args=None
+            save_script=None, main_command_args=None
     ):
         task_ids = [task_id]
         if schedule_all_tasks and "--array" not in self._slurm_params:
@@ -241,20 +238,7 @@ class SBatch:
                     )
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
-            if run_script:
-                process = Popen(
-                    ["sbatch"],
-                    stdin=PIPE,
-                    stdout=PIPE,
-                    stderr=PIPE
-                )
-                (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
-                print(slurm_script)
-                out, err = bytes.decode(out), bytes.decode(err)
-                if len(out):
-                    print(out)
-                if len(err):
-                    print(err)
+            run(slurm_script)
 
 
 def get_arg_value(value):
@@ -263,74 +247,17 @@ def get_arg_value(value):
     return str(value).replace('"', '\\"')
 
 
-def get_dotlist_params(cfg, cond=None):
-    dotlist = {}
-
-    def gather(_cfg):
-        if isinstance(_cfg, ListConfig):
-            raise ValueError("ListConfig not supported as first container.")
-        for key in _cfg:
-            dotlist_key = _cfg._get_full_key(key)  # noqa
-            if isinstance(_cfg[key], DictConfig):
-                gather(_cfg[key])
-            elif cond is None or cond(dotlist_key, _cfg[key]):
-                dotlist[dotlist_key] = _cfg[key]
-
-    gather(cfg)
-    return dotlist
-
-
-def is_excluded(keys, values, excluded):
-    for excluded_item in excluded:
-        for key, value in zip(keys, values):
-            if key in excluded_item.keys() and value != excluded_item[key]:
-                break
-        else:
-            return True
-    return False
-
-
-def get_grid_combinations(args, grid_search, exclude=None):
-    def cond(key, val):
-        return key in grid_search and isinstance(val, ListConfig)
-
-    unstructured_dict = get_dotlist_params(args, cond=cond)
-
-    keys, values = zip(*unstructured_dict.items())
-    all_combinations = list(product(*values))
-    if exclude is not None:
-        all_combinations = [
-            comb for comb in all_combinations
-            if not is_excluded(keys, comb, exclude)
-        ]
-    n_jobs = len(all_combinations)
-    new_dict = []
-    for k, key in enumerate(keys):
-        combination = ', '.join(
-            [str(all_combinations[i][k])
-             for i in range(len(all_combinations))]
-        )
-        new_dict.append(
-            f"{key}=[{combination}]"
-        )
-    new_values = OmegaConf.from_dotlist(new_dict)
-    return n_jobs, OmegaConf.merge(args, new_values)
-
-
-def auto_sbatch(
-        run_command,
-        slurm_params=None,
-        params=None,
-        *,
-        grid_search=None,
-        grid_search_exclude=None,
-        run_script=None,
-        experiment_handler: ExperimentHandler = None
-):
-    SBatch(
-        slurm_params, params,
-        grid_search=grid_search,
-        grid_search_exclude=grid_search_exclude,
-        run_script=run_script,
-        experiment_handler=experiment_handler
-    )(run_command)
+def run(slurm_script):
+    process = Popen(
+        ["sbatch"],
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=PIPE
+    )
+    (out, err) = process.communicate(bytes(slurm_script, 'utf-8'))
+    print(slurm_script)
+    out, err = bytes.decode(out), bytes.decode(err)
+    if len(out):
+        print(out)
+    if len(err):
+        print(err)

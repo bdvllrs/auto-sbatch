@@ -17,25 +17,6 @@ It works by generating a SLURM script on the fly and passing it to sbatch.
 
 ## In Python
 
-### `auto_sbatch` function
-
-```python
-from auto_sbatch import auto_sbatch
-
-# Main command that will be run
-run_command = "python {script_name} {all_params}"
-slurm_args = {
-    "-J": "job-name",
-    "-N": 1,
-    "--time": "01:00:00"
-}
-auto_sbatch(
-    run_command, slurm_args, run_script="main.py"
-)
-```
-
-### `SBatch` class
-
 ```python
 from auto_sbatch import SBatch
 
@@ -44,16 +25,18 @@ slurm_args = {
     "-N": 1,
     "--time": "01:00:00"
 }
+
 job_args = {
     "script_param": 7
     # this will be given when the script is run as `python main.py "script_param=7"`
 }
+
 sbatch = SBatch(
-    slurm_args, job_args, run_script="main.py"
+    slurm_args, job_args, script_name="main.py"
 )
 
-run_command = "python {script_name} {all_params}"
-sbatch(run_command)  # Will add experiment to queue
+# Will add experiment to queue
+sbatch.run(r"python {script_name} {all_params}")  
 ```
 
 ## Grid-Search
@@ -62,7 +45,7 @@ Add a `grid_search` parameter with a list of the parameter to build the
 grid-search over.
 
 ```python
-from auto_sbatch import SBatch
+from auto_sbatch import GridSearch, SBatch
 
 slurm_args = {
     "-J": "job-name",
@@ -71,17 +54,21 @@ slurm_args = {
     "--array": "auto"
     # this will be automatically changed to the number of generated jobs.
 }
+
 job_args = {
     "param1": [0, 1],
     "param2": [0, 1],
 }
+
+grid_search = GridSearch(["param1", "param2"])
+
 sbatch = SBatch(
     slurm_args, job_args,
-    grid_search=["param1", "param2"], run_script="main.py"
+    script_name="main.py",
+    grid_search=grid_search
 )
 
-run_command = "python {script_name} {all_params}"
-sbatch(run_command)
+sbatch.run("python {script_name} {all_params}")
 ```
 
 Here, it will prepare and start 4 jobs where `param1` and `param2` will have
@@ -95,11 +82,11 @@ A grid search can be executed in several manners:
   jobs sequentially. Be careful to adapt the
   length of the job to accommodate all runs.
 
-You can exclude some combinations by providing the `grid_search_exclude`
-parameter.
+You can exclude some combinations by providing the `exclude`
+parameter to grid_search.
 
 ```python
-from auto_sbatch import SBatch
+from auto_sbatch import GridSearch, SBatch
 
 slurm_args = {
     "-J": "job-name",
@@ -113,15 +100,19 @@ job_args = {
     "param1": [0, 1],
     "param2": [0, 1],
 }
-sbatch = SBatch(
-    slurm_args, job_args,
-    grid_search=["param1", "param2"],
-    grid_search_exclude=[{"param1": 0, "param2": 0}],  # excludes (0, 0)
-    run_script="main.py"
+
+grid_search = GridSearch(
+    ["param1", "param2"],
+    exclude=[{"param1": 0, "param2": 0}]  # excludes (0, 0)
 )
 
-run_command = "python {script_name} {all_params}"
-sbatch(run_command)
+sbatch = SBatch(
+    slurm_args, job_args,
+    script_name="main.py",
+    grid_search=grid_search,
+)
+
+sbatch.run("python {script_name} {all_params}")
 ```
 
 will only run 3 jobs.
@@ -130,16 +121,16 @@ If you want to manage the tasks yourself, you can set the `task_id` parameter:
 
 ```python
 for task_id in range(sbatch.num_available_jobs):
-    run_command = "python {script_name} {all_params}"
     task_params = sbatch.get_task_params(task_id)
-    sbatch(run_command, task_id)  # will only schedule one task
+    # will only schedule one task
+    sbatch.run("python {script_name} {all_params}", task_id)
 ```
 
 Or you can schedule all tasks one after the other (without a SLURM array):
 
 ```python
-run_command = "python {script_name} {all_params}"
-sbatch(run_command, schedule_all_tasks=True)  # will schedule everything
+# will schedule everything
+sbatch.run("python {script_name} {all_params}", schedule_all_tasks=True)
 ```
 
 ## ExperimentHandler
@@ -187,7 +178,8 @@ slurm_args = {
     "--time": "01:00:00"
 }
 sbatch = SBatch(
-    slurm_args, experiment_handler=handler
+    slurm_args,
+    experiment_handler=handler
 )
 
 # By default, a script is added to the commands in the SLURM script. You can add other commands that will

@@ -1,6 +1,6 @@
 import unittest.mock as mock
 
-from auto_sbatch import auto_sbatch
+from auto_sbatch import GridSearch, SBatch
 from tests.utils import mock_for_tests
 
 
@@ -13,12 +13,14 @@ def test_start_simple_batch(p_open, capsys):
         "-N": 1,
         "--time": "01:00:00"
     }
-    run_script = "main.py"
+    script_name = "main.py"
 
-    auto_sbatch(
-        "python {script_name} {all_params}",
+    sbatch = SBatch(
         slurm_params,
-        run_script=run_script,
+        script_name=script_name,
+    )
+    sbatch.run(
+        "python {script_name} {all_params}"
     )
     captured = capsys.readouterr()
     expected_output = "#!/bin/sh\n"
@@ -30,7 +32,7 @@ def test_start_simple_batch(p_open, capsys):
 
     expected_output += "\n"
     expected_output += "taskId=0\n"
-    expected_output += f"python {run_script} \n"
+    expected_output += f"python {script_name} \n"
     expected_output += "Mocked communication output\n"
     expected_output += "Mocked communication error\n"
 
@@ -54,20 +56,20 @@ def test_params(p_open, capsys):
         },
         "param3": [1, 2, 3],
     }
-    run_script = "main.py"
+    script_name = "main.py"
     command = "python {script_name} {all_params}"
 
-    auto_sbatch(
-        command,
+    sbatch = SBatch(
         slurm_params,
         params,
-        run_script=run_script,
+        script_name=script_name,
     )
+    sbatch.run(command)
 
     captured_out = capsys.readouterr().out.strip("\n").split("\n")
     command_out = captured_out[-3]
     expected_command = command.format(
-        script_name=run_script,
+        script_name=script_name,
         all_params='"param1=1" "param2.param2_1=null" '
                    '"param2.param2_2=a" '
                    '"param3=[1, 2, 3]"'
@@ -87,20 +89,20 @@ def test_grid_search_no_array(p_open, capsys):
     params = {
         "param1": [1, 2, 3],
     }
-    grid_search = ["param1"]
-    run_script = "main.py"
+    grid_search = GridSearch(["param1"])
+    script_name = "main.py"
     command = "python {script_name} {all_params}"
 
-    auto_sbatch(
-        command,
+    sbatch = SBatch(
         slurm_params,
         params,
+        script_name=script_name,
         grid_search=grid_search,
-        run_script=run_script,
     )
+    sbatch.run(command)
 
     captured_out = capsys.readouterr().out.strip("\n").split("\n")[5:-2]
-    for k, key in enumerate(grid_search):
+    for k, key in enumerate(grid_search._selected_params):
         param_val = '("' + '" "'.join(map(str, params[key])) + '")'
         print(param_val)
         assert captured_out[k] == f"{key}_param={param_val}"

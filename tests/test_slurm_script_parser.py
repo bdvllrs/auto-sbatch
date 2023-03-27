@@ -27,7 +27,7 @@ def test_slurm_script_parser():
     assert parser.slurm_params["--error"] == "job-name.err"
 
     assert parser.main_command == main_command
-    assert parser.run_script == "main.py"
+    assert parser.script_name == "main.py"
     assert parser.params is not None
     assert "script_param" in parser.params.keys()
     assert "another_param" in parser.params.keys()

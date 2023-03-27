@@ -19,10 +19,11 @@ def test_sbatch(p_open, subprocess, capsys):
         {"script_param": 7},
         # this will be given when the script is run as `python main.py
         # "script_param=7"`
-        run_script="main.py"
+        script_name="main.py"
     )
 
-    sbatch("python {script_name} {all_params}")  # Will add experiment to queue
+    sbatch.run("python {script_name} {all_params}")  # Will add experiment to
+    # queue
 
 
 @mock.patch("auto_sbatch.processes.subprocess")
@@ -70,7 +71,8 @@ def test_handled_sbatch(p_open, subprocess, capsys):
         {"script_param": 7},
         # this will be given when the script is run as `python main.py
         # "script-param=7"`
-        run_script="main.py", experiment_handler=handler
+        script_name="main.py",
+        experiment_handler=handler
     )
-
-    sbatch("python {script_name} {all_params}")  # Will add experiment to queue
+    # Will add experiment to queue
+    sbatch.run("python {script_name} {all_params}")
