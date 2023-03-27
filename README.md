@@ -186,7 +186,7 @@ sbatch = SBatch(
 # be executed before.
 sbatch.add_command("echo $SLURM_JOB_ID")
 
-sbatch("python {script_name} {all_params}")  # batch the experiment!
+sbatch.run("python {script_name} {all_params}")  # batch the experiment!
 ```
 
 ### Available shortcuts for `run_command`
