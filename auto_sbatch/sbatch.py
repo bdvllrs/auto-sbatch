@@ -39,7 +39,7 @@ class SBatch:
     def configure_from_experiment_handler(self, handler: ExperimentHandler):
         self.add_commands(handler.new_run())
         self._main_command_args.update(handler.get_main_command_args())
-        self.set_script_name(handler.script_location)
+        self.set_script_name(handler.script_location.name)
 
     def set_script_name(self, script_name):
         self._script_name = script_name
