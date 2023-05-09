@@ -17,6 +17,13 @@ def test_set_grid_combination():
     assert new_args.b == [3, 4, 3, 4]
 
 
+def test_set_grid_combination_one_elem():
+    n_jobs, new_args = _get_grid_combinations(args, ["a"])
+    assert n_jobs == 2
+    assert new_args.a == [1, 2]
+    assert new_args.b == [3, 4]
+
+
 def test_set_grid_combination_exclude():
     exclude = [{"a": 1, "b": 3}]
     n_jobs, new_args = _get_grid_combinations(args, ["a", "b"], exclude)
