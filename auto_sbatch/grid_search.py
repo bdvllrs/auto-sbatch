@@ -22,6 +22,11 @@ class GridSearch:
 
 def _is_excluded(keys, values, excluded):
     for excluded_item in excluded:
+        if not set(excluded_item.keys()).issubset(set(keys)):
+            raise ValueError(
+                "Keys of excluded item must be a subset of keys used "
+                "for grid-search."
+            )
         for key, value in zip(keys, values):
             if key in excluded_item.keys() and value != excluded_item[key]:
                 break

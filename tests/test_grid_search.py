@@ -1,3 +1,4 @@
+import pytest
 from omegaconf import OmegaConf
 
 from auto_sbatch.grid_search import _get_grid_combinations
@@ -38,3 +39,9 @@ def test_set_grid_combination_exclude_missing_val():
     assert n_jobs == 2
     assert new_args.a == [2, 2]
     assert new_args.b == [3, 4]
+
+
+def test_set_grid_combination_exclude_extra_val():
+    exclude = [{"b": [4, 3]}]
+    with pytest.raises(ValueError):
+        _get_grid_combinations(args, ["a"], exclude)
