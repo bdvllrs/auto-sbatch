@@ -1,7 +1,5 @@
 from itertools import product
 
-from omegaconf import ListConfig, OmegaConf
-
 from auto_sbatch.utils import get_dotlist_params
 
 
@@ -45,18 +43,14 @@ def _get_grid_combinations(args, grid_search, exclude=None):
     all_combinations = list(product(*values))
     if exclude is not None:
         all_combinations = [
-            comb for comb in all_combinations
-            if not _is_excluded(keys, comb, exclude)
+            comb for comb in all_combinations if not _is_excluded(keys, comb, exclude)
         ]
     n_jobs = len(all_combinations)
     new_dict = []
     for k, key in enumerate(keys):
-        combination = ', '.join(
-            [str(all_combinations[i][k])
-             for i in range(len(all_combinations))]
+        combination = ", ".join(
+            [str(all_combinations[i][k]) for i in range(len(all_combinations))]
         )
-        new_dict.append(
-            f"{key}=[{combination}]"
-        )
+        new_dict.append(f"{key}=[{combination}]")
     new_values = OmegaConf.from_dotlist(new_dict)
     return n_jobs, OmegaConf.merge(args, new_values)

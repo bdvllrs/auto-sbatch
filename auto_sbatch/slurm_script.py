@@ -1,7 +1,5 @@
 import re
-from typing import Any, Dict, Tuple
-
-from omegaconf import OmegaConf
+from typing import Any
 
 from auto_sbatch.processes import Command
 
@@ -10,7 +8,7 @@ class SlurmScriptParser:
     def __init__(self, slurm_script: str, main_command: str):
         self._slurm_script = slurm_script
         self._main_command = main_command
-        self.slurm_params: Dict[str, Any] = {}
+        self.slurm_params: dict[str, Any] = {}
         self.commands = []
         self.post_commands = []
         self.main_command = None
@@ -27,9 +25,7 @@ class SlurmScriptParser:
             "all_params": r"(.*)",
         }
         for key, val in possible_formats.items():
-            self._main_command = self._main_command.replace(
-                "{" + key + "}", val
-            )
+            self._main_command = self._main_command.replace("{" + key + "}", val)
 
     def parse(self) -> None:
         script_lines = self._slurm_script.strip("\n").split("\n")
@@ -46,8 +42,7 @@ class SlurmScriptParser:
                 self.script_name = matches.group(1)
                 dotlist = matches.group(2).split(" ")
                 dotlist = [
-                    match[1:-1] if match.startswith('"') else match
-                    for match in dotlist
+                    match[1:-1] if match.startswith('"') else match for match in dotlist
                 ]
                 self.params = OmegaConf.from_dotlist(dotlist)
                 has_main_command = True
@@ -57,7 +52,7 @@ class SlurmScriptParser:
                 self.post_commands.append(Command(line))
 
     @staticmethod
-    def _parse_slurm_line(line) -> Tuple[str, Any]:
+    def _parse_slurm_line(line: str) -> tuple[str, Any]:
         line = line.replace("#SBATCH", "").strip()
         if "=" in line:
             key, val = line.split("=")
