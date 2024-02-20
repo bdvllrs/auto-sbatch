@@ -55,15 +55,15 @@ slurm_args = {
     # this will be automatically changed to the number of generated jobs.
 }
 
-job_args = {
+grid_search_args = {
     "param1": [0, 1],
     "param2": [0, 1],
 }
 
-grid_search = GridSearch(["param1", "param2"])
+grid_search = GridSearch(grid_search_args)
 
 sbatch = SBatch(
-    slurm_args, job_args,
+    slurm_args,
     script_name="main.py",
     grid_search=grid_search
 )
@@ -96,18 +96,18 @@ slurm_args = {
     # this will be automatically changed to the number of generated jobs.
 }
 
-job_args = {
+grid_search_args = {
     "param1": [0, 1],
     "param2": [0, 1],
 }
 
 grid_search = GridSearch(
-    ["param1", "param2"],
+    grid_search_args,
     exclude=[{"param1": 0, "param2": 0}]  # excludes (0, 0)
 )
 
 sbatch = SBatch(
-    slurm_args, job_args,
+    slurm_args,
     script_name="main.py",
     grid_search=grid_search,
 )
