@@ -31,5 +31,5 @@ def test_slurm_script_parser():
     assert parser.params is not None
     assert "script_param" in parser.params.keys()
     assert "another_param" in parser.params.keys()
-    assert parser.params.script_param == 7
-    assert parser.params.another_param == "a"
+    assert parser.params["script_param"] == 7
+    assert parser.params["another_param"] == "a"

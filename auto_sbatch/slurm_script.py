@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any
 
@@ -9,11 +10,11 @@ class SlurmScriptParser:
         self._slurm_script = slurm_script
         self._main_command = main_command
         self.slurm_params: dict[str, Any] = {}
-        self.commands = []
-        self.post_commands = []
-        self.main_command = None
-        self.script_name = None
-        self.params = None
+        self.commands: list[Command] = []
+        self.post_commands: list[Command] = []
+        self.main_command: str | None = None
+        self.script_name: str | None = None
+        self.params: dict[str, Any] | None = None
 
     def _format_main_command(self):
         possible_formats = {
@@ -41,10 +42,14 @@ class SlurmScriptParser:
                 self.main_command = line
                 self.script_name = matches.group(1)
                 dotlist = matches.group(2).split(" ")
-                dotlist = [
-                    match[1:-1] if match.startswith('"') else match for match in dotlist
-                ]
-                self.params = OmegaConf.from_dotlist(dotlist)
+                self.params = {}
+                for match in dotlist:
+                    if match.startswith('"'):
+                        key, val = self._parse_slurm_line(match[1:-1])
+                    else:
+                        key, val = self._parse_slurm_line(match)
+
+                    self.params[key] = json.loads('{"key": ' + val + "}")["key"]
                 has_main_command = True
             elif not has_main_command:
                 self.commands.append(Command(line))

@@ -11,6 +11,7 @@ class GridSearch:
     ):
         self._values = values
         self._exclude = exclude or []
+        self.n_jobs, self.combinations = self.get_combinations()
 
     def get_combinations(self) -> tuple[int, dict[str, list[Any]]]:
         keys, values = tuple(zip(*self._values.items()))
@@ -25,6 +26,11 @@ class GridSearch:
         for k, key in enumerate(keys):
             new_values[key] = [comb[k] for comb in all_combinations]
         return njobs, new_values
+
+    def job_params(self, job_id: int) -> dict[str, Any]:
+        if 0 < job_id or job_id >= self.n_jobs:
+            raise ValueError(f"job_id should be >= 0 and < {self.n_jobs}")
+        return {key: val[job_id] for key, val in self.combinations.items()}
 
     def __contains__(self, item: str) -> bool:
         return item in self._values

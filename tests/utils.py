@@ -14,6 +14,6 @@ def mock_for_tests(*, p_open=None, subprocess=None):
         p_open_instance = mock.MagicMock()
         p_open_instance.communicate.return_value = (
             b"Mocked communication output",
-            b"Mocked communication error"
+            b"Mocked communication error",
         )
         p_open.return_value = p_open_instance

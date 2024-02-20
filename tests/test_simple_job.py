@@ -8,20 +8,14 @@ from tests.utils import mock_for_tests
 def test_start_simple_batch(p_open, capsys):
     mock_for_tests(p_open=p_open)
 
-    slurm_params = {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
-    }
+    slurm_params = {"-J": "job-name", "-N": 1, "--time": "01:00:00"}
     script_name = "main.py"
 
     sbatch = SBatch(
         slurm_params,
         script_name=script_name,
     )
-    sbatch.run(
-        "python {script_name} {all_params}"
-    )
+    sbatch.run("python {script_name} {all_params}")
     captured = capsys.readouterr()
     expected_output = "#!/bin/sh\n"
     for key, val in slurm_params.items():
@@ -43,17 +37,11 @@ def test_start_simple_batch(p_open, capsys):
 def test_params(p_open, capsys):
     mock_for_tests(p_open=p_open)
 
-    slurm_params = {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
-    }
+    slurm_params = {"-J": "job-name", "-N": 1, "--time": "01:00:00"}
     params = {
         "param1": "1",
-        "param2": {
-            "param2_1": None,
-            "param2_2": "a",
-        },
+        "param2.param2_1": None,
+        "param2.param2_2": "a",
         "param3": [1, 2, 3],
     }
     script_name = "main.py"
@@ -71,8 +59,8 @@ def test_params(p_open, capsys):
     expected_command = command.format(
         script_name=script_name,
         all_params='"param1=1" "param2.param2_1=null" '
-                   '"param2.param2_2=a" '
-                   '"param3=[1, 2, 3]"'
+        '"param2.param2_2=a" '
+        '"param3=[1, 2, 3]"',
     )
     assert command_out == expected_command
 
@@ -81,30 +69,24 @@ def test_params(p_open, capsys):
 def test_grid_search_no_array(p_open, capsys):
     mock_for_tests(p_open=p_open)
 
-    slurm_params = {
-        "-J": "job-name",
-        "-N": 1,
-        "--time": "01:00:00"
-    }
+    slurm_params = {"-J": "job-name", "-N": 1, "--time": "01:00:00"}
     params = {
         "param1": [1, 2, 3],
     }
-    grid_search = GridSearch(["param1"])
+    grid_search = GridSearch(params)
     script_name = "main.py"
     command = "python {script_name} {all_params}"
 
     sbatch = SBatch(
         slurm_params,
-        params,
         script_name=script_name,
         grid_search=grid_search,
     )
     sbatch.run(command)
 
     captured_out = capsys.readouterr().out.strip("\n").split("\n")[5:-2]
-    for k, key in enumerate(grid_search._selected_params):
+    for k, key in enumerate(grid_search._values):
         param_val = '("' + '" "'.join(map(str, params[key])) + '")'
-        print(param_val)
         assert captured_out[k] == f"{key}_param={param_val}"
     assert captured_out[-1] == "done"
     assert captured_out[-2].split(" ")[0] == "python"

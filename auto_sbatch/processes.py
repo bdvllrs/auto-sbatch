@@ -20,7 +20,7 @@ class Python(Command):
         return "python << EOF\n" + self.command + "\nEOF"
 
 
-def run(command: str | Command):
+def run(command: str | list | Command):
     if isinstance(command, str):
         command = Command(command)
     if isinstance(command, list):

@@ -43,6 +43,6 @@ def test_set_grid_combination_exclude_missing_val():
 
 def test_set_grid_combination_exclude_extra_val():
     exclude = [{"b": [4, 3]}]
-    gs = GridSearch({"a": [1, 2]}, exclude)
     with pytest.raises(ValueError):
+        gs = GridSearch({"a": [1, 2]}, exclude)
         gs.get_combinations()

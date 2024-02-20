@@ -1,4 +1,5 @@
 from collections.abc import Iterable, Mapping
+from os import PathLike
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Any, List
@@ -12,15 +13,15 @@ from auto_sbatch.slurm_script import SlurmScriptParser
 class SBatch:
     def __init__(
         self,
-        slurm_params: Mapping[str, Any] | None = None,
-        params: Mapping[str, Any] | None = None,
+        slurm_params: dict[str, Any] | None = None,
+        script_params: dict[str, Any] | None = None,
         *,
         grid_search: GridSearch | None = None,
         script_name: str | None = None,
         experiment_handler: ExperimentHandler | None = None,
     ):
         self._slurm_params = slurm_params or {}
-        self._params = params or {}
+        self._script_params = script_params or {}
         self._commands: List[Command] = []
         self._post_commands: List[Command] = []
         self._n_job_seq = 1
@@ -55,33 +56,15 @@ class SBatch:
     def num_available_jobs(self) -> int:
         return self._n_job_seq
 
-    def _is_grid_search_key(self, key, value):
-        return (
-            self._grid_search is not None
-            and key in self._grid_search
-            and isinstance(value, ListConfig)
-        )
-
     def _is_slurm_array_auto(self) -> bool:
         return (
             "--array" in self._slurm_params and self._slurm_params["--array"] == "auto"
         )
 
-    def get_task_params(self, task_id: int = 0):
-        dot_params = get_dotlist_params(self._params)
-        params = {}
-        for key, value in dot_params.items():
-            if self._is_grid_search_key(key, value):
-                key_var = key.replace(".", "").replace("/", "")
-                params[key_var] = value[task_id]
-            else:
-                params[key] = value
-        return params
-
     def set_grid_search(self):
         n_jobs = None
         if self._grid_search is not None:
-            n_jobs, self._params = self._grid_search.get_combinations(self._params)
+            n_jobs = self._grid_search.n_jobs
             self._n_job_seq = n_jobs
         if self._is_slurm_array_auto():
             if n_jobs is None:
@@ -98,26 +81,35 @@ class SBatch:
                 return int(s[1])
         return 0
 
+    def _is_grid_search_key(self, key: str) -> bool:
+        if self._grid_search is None:
+            return False
+        return key in self._grid_search.combinations.keys()
+
     def get_run_params(self) -> dict[str, str]:
         params = {"params": "", "grid_search": "", "all": "", "grid_search_string": ""}
-        dot_params = get_dotlist_params(self._params)
         param_end = "_param"
         if "--array" in self._slurm_params:
             param_end += "[$taskId]"
-        for key, value in dot_params.items():
-            if self._is_grid_search_key(key, value):
-                key_var = key.replace(".", "_").replace("/", "_")
-                s = '"' + key + "=${" + key_var + param_end + '}"'
-                params["grid_search"] += f" {s}"
-                params["all"] += f" {s}"
-                params["grid_search_string"] += (
-                    "_" + key + "=${" + key_var + param_end + "}"
-                )
-            else:
+        grid_search_params: dict[str, Any] = {}
+        if self._grid_search is not None:
+            grid_search_params = self._grid_search.combinations
+        for key, value in self._script_params.items():
+            if key not in grid_search_params:
                 escaped_value = get_arg_value(value)
                 s = f'"{key}={escaped_value}"'
                 params["params"] += f" {s}"
                 params["all"] += f" {s}"
+        for key in grid_search_params.keys():
+            key_var = key.replace(".", "_").replace("/", "_")
+            s = '"' + key + "=${" + key_var + param_end + '}"'
+            params["grid_search"] += f" {s}"
+            params["all"] += f" {s}"
+            params["grid_search_string"] += (
+                "_" + key + "=${" + key_var + param_end + "}"
+            )
+        for key, val in params.items():
+            params[key] = val[1:]
         return params
 
     def add_command(self, command: str | Command, post: bool = False):
@@ -135,16 +127,14 @@ class SBatch:
         self,
         run_command: str | Command,
         task_id: int | None = None,
-        main_command_args=None,
-    ):
+        main_command_args: Mapping[str, str] | None = None,
+    ) -> str:
         run_command = Command(run_command)
-        dot_params_slurm = get_dotlist_params(self._slurm_params)
-        dot_params = get_dotlist_params(self._params)
         script_name = self._script_name
 
         slurm_script = "#!/bin/sh"
 
-        for key, value in dot_params_slurm.items():
+        for key, value in self._slurm_params.items():
             if key[:2] == "--":
                 slurm_script += f"\n#SBATCH {key}={value}"
             elif key[:1] == "-":
@@ -153,16 +143,15 @@ class SBatch:
         for command in self._commands:
             slurm_script += f"\n{command.get()}"
 
-        for key, param_values in dot_params.items():
-            if (
-                self._is_grid_search_key(key, param_values)
-                and "--array" not in dot_params_slurm
-                and task_id is not None
-            ):
+        grid_search_params = {}
+        if self._grid_search is not None:
+            grid_search_params = self._grid_search.combinations
+        for key, param_values in grid_search_params.items():
+            if "--array" not in self._slurm_params and task_id is not None:
                 key_var = key.replace(".", "_").replace("/", "_")
                 formatted_value = get_arg_value(param_values[task_id])
                 slurm_script += f"\n{key_var}_param={formatted_value}"
-            elif self._is_grid_search_key(key, param_values):
+            else:
                 key_var = key.replace(".", "_").replace("/", "_")
                 slurm_script += (
                     "\n"
@@ -172,7 +161,7 @@ class SBatch:
                     + '")'
                 )
 
-        if "--array" in dot_params_slurm:
+        if "--array" in self._slurm_params:
             slurm_script += "\ntaskId=$SLURM_ARRAY_TASK_ID"
         elif task_id is None and self._n_job_seq > 1:
             slurm_script += "\nfor taskId in $(seq 0 "
@@ -198,7 +187,7 @@ class SBatch:
         if (
             self._n_job_seq > 1
             and task_id is None
-            and "--array" not in dot_params_slurm
+            and "--array" not in self._slurm_params
         ):
             slurm_script += "\ndone"
 
@@ -209,11 +198,11 @@ class SBatch:
 
     def run(
         self,
-        run_command,
-        task_id=None,
-        schedule_all_tasks=False,
-        save_script=None,
-        main_command_args=None,
+        run_command: str | Command,
+        task_id: int | None = None,
+        schedule_all_tasks: bool = False,
+        save_script: str | PathLike | None = None,
+        main_command_args: Mapping[str, str] | None = None,
     ):
         task_ids = [task_id]
         if schedule_all_tasks and "--array" not in self._slurm_params:
@@ -226,25 +215,25 @@ class SBatch:
                 path_location = Path(save_script)
                 if task_id is not None:
                     path_location = path_location.with_name(
-                        path_location.name + "_" + task_id
+                        path_location.name + "_" + str(task_id)
                     )
                 with open(path_location, "w") as f:
                     f.write(slurm_script)
             run(slurm_script)
 
 
-def get_arg_value(value):
+def get_arg_value(value: Any) -> str:
     if value is None:
         return "null"
     return str(value).replace('"', '\\"')
 
 
-def run(slurm_script):
+def run(slurm_script: str):
     process = Popen(["sbatch"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
     (out, err) = process.communicate(bytes(slurm_script, "utf-8"))
     print(slurm_script)
-    out, err = bytes.decode(out), bytes.decode(err)
-    if len(out):
-        print(out)
-    if len(err):
-        print(err)
+    out_s, err_s = bytes.decode(out), bytes.decode(err)
+    if len(out_s):
+        print(out_s)
+    if len(err_s):
+        print(err_s)

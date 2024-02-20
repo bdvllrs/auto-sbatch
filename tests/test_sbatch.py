@@ -11,15 +11,11 @@ def test_sbatch(p_open, subprocess, capsys):
     mock_for_tests(p_open=p_open, subprocess=subprocess)
 
     sbatch = SBatch(
-        {
-            "-J": "job-name",
-            "-N": 1,
-            "--time": "01:00:00"
-        },
+        {"-J": "job-name", "-N": 1, "--time": "01:00:00"},
         {"script_param": 7},
         # this will be given when the script is run as `python main.py
         # "script_param=7"`
-        script_name="main.py"
+        script_name="main.py",
     )
 
     sbatch.run("python {script_name} {all_params}")  # Will add experiment to
@@ -48,9 +44,7 @@ def test_handled_sbatch(p_open, subprocess, capsys):
     # modules to load in the batch system
     run_modules = ["python/3.8.5", "cuda/11.5"]
     # Additional scripts to run before batching the script
-    additional_scripts = [
-        'pip install numpy'
-    ]
+    additional_scripts = ["pip install numpy"]
 
     handler = ExperimentHandler(
         script_location,
@@ -59,7 +53,7 @@ def test_handled_sbatch(p_open, subprocess, capsys):
         python_environment,
         pre_modules,
         run_modules,
-        additional_scripts
+        additional_scripts,
     )
 
     sbatch = SBatch(
@@ -72,7 +66,7 @@ def test_handled_sbatch(p_open, subprocess, capsys):
         # this will be given when the script is run as `python main.py
         # "script-param=7"`
         script_name="main.py",
-        experiment_handler=handler
+        experiment_handler=handler,
     )
     # Will add experiment to queue
     sbatch.run("python {script_name} {all_params}")
