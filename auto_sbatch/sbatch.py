@@ -13,15 +13,15 @@ from auto_sbatch.slurm_script import SlurmScriptParser
 class SBatch:
     def __init__(
         self,
-        slurm_params: dict[str, Any] | None = None,
-        script_params: dict[str, Any] | None = None,
+        slurm_params: Mapping[str, Any] | None = None,
+        script_params: Mapping[str, Any] | None = None,
         *,
         grid_search: GridSearch | None = None,
         script_name: str | None = None,
         experiment_handler: ExperimentHandler | None = None,
     ):
-        self._slurm_params = slurm_params or {}
-        self._script_params = script_params or {}
+        self._slurm_params = dict(slurm_params or {})
+        self._script_params = dict(script_params or {})
         self._commands: List[Command] = []
         self._post_commands: List[Command] = []
         self._n_job_seq = 1

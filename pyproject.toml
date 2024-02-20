@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auto-sbatch"
-version = "0.4.0"
+version = "0.4.1"
 description = "Create SLURM scripts automatically from your python script."
 authors = ["bdvllrs <bdvllrs@gmail.com>"]
 license = "MIT"
