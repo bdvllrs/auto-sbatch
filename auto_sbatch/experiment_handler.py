@@ -1,20 +1,21 @@
 from pathlib import Path
+from typing import Any
 
 from auto_sbatch.processes import run
 
 
 class ExperimentHandler:
     def __init__(
-            self,
-            script_location,
-            work_directory=".",
-            run_work_directory=".",
-            python_environment=None,
-            pre_modules=None,
-            run_modules=None,
-            additional_scripts=None,
-            setup_experiment=True,
-            exclude_in_rsync=None,
+        self,
+        script_location,
+        work_directory=".",
+        run_work_directory=".",
+        python_environment=None,
+        pre_modules=None,
+        run_modules=None,
+        additional_scripts=None,
+        setup_experiment=True,
+        exclude_in_rsync=None,
     ):
         self.script_location = Path(script_location)
         self.run_work_directory = Path(run_work_directory)
@@ -52,10 +53,7 @@ class ExperimentHandler:
 
     def source_environment(self):
         if self.python_environment is not None:
-            run(
-                ["echo",
-                 f"Activate environment {str(self.python_environment)}"]
-            )
+            run(["echo", f"Activate environment {str(self.python_environment)}"])
             run(self._get_environment())
 
     def setup_experiment(self):
@@ -64,8 +62,12 @@ class ExperimentHandler:
                 run(["pip", "install", "-e", str(self.work_directory)])
             elif (self.work_directory / "requirements.txt").exists():
                 run(
-                    ["pip", "install", "-r",
-                     str(self.work_directory / "requirements.txt")]
+                    [
+                        "pip",
+                        "install",
+                        "-r",
+                        str(self.work_directory / "requirements.txt"),
+                    ]
                 )
             if (self.work_directory / "offline_setup.py").exists():
                 run(["python", str(self.work_directory / "offline_setup")])
@@ -95,17 +97,14 @@ class ExperimentHandler:
             [
                 'mkdir -p "$runWorkdirJob"',
                 'mkdir "$runWorkdirJob/checkpoints"',
-
-                f'rsync -a {str(self.work_directory)} $runWorkdirJob '
-                f'{excluded_command}',
+                f"rsync -a {str(self.work_directory)} $runWorkdirJob "
+                f"{excluded_command}",
                 f'cd "$runWorkdirJob/{self.work_directory.resolve().name}/'
                 f'{str(self.script_location.parent)}"',
-                'module purge'
+                "module purge",
             ]
         )
-        commands.extend(
-            [f'module load {module}' for module in self.run_modules]
-        )
+        commands.extend([f"module load {module}" for module in self.run_modules])
         if self.python_environment is not None:
             commands.extend(
                 [
@@ -115,7 +114,5 @@ class ExperimentHandler:
         return commands
 
     @staticmethod
-    def get_main_command_args():
-        return {
-            "checkpoints_dir": "../../checkpoints/$jobId"
-        }
+    def get_main_command_args() -> dict[str, Any]:
+        return {"checkpoints_dir": "../../checkpoints/$jobId"}

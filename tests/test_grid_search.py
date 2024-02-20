@@ -1,47 +1,48 @@
 import pytest
-from omegaconf import OmegaConf
 
-from auto_sbatch.grid_search import _get_grid_combinations
+from auto_sbatch.grid_search import GridSearch
 
-args = OmegaConf.create(
-    {
-        "a": [1, 2],
-        "b": [3, 4],
-    }
-)
+args = {
+    "a": [1, 2],
+    "b": [3, 4],
+}
 
 
 def test_set_grid_combination():
-    n_jobs, new_args = _get_grid_combinations(args, ["a", "b"])
+    gs = GridSearch(args)
+    n_jobs, new_args = gs.get_combinations()
     assert n_jobs == 4
-    assert new_args.a == [1, 1, 2, 2]
-    assert new_args.b == [3, 4, 3, 4]
+    assert new_args["a"] == [1, 1, 2, 2]
+    assert new_args["b"] == [3, 4, 3, 4]
 
 
 def test_set_grid_combination_one_elem():
-    n_jobs, new_args = _get_grid_combinations(args, ["a"])
+    gs = GridSearch({"a": [1, 2]})
+    n_jobs, new_args = gs.get_combinations()
     assert n_jobs == 2
-    assert new_args.a == [1, 2]
-    assert new_args.b == [3, 4]
+    assert new_args["a"] == [1, 2]
 
 
 def test_set_grid_combination_exclude():
     exclude = [{"a": 1, "b": 3}]
-    n_jobs, new_args = _get_grid_combinations(args, ["a", "b"], exclude)
+    gs = GridSearch(args, exclude)
+    n_jobs, new_args = gs.get_combinations()
     assert n_jobs == 3
-    assert new_args.a == [1, 2, 2]
-    assert new_args.b == [4, 3, 4]
+    assert new_args["a"] == [1, 2, 2]
+    assert new_args["b"] == [4, 3, 4]
 
 
 def test_set_grid_combination_exclude_missing_val():
     exclude = [{"a": 1}]
-    n_jobs, new_args = _get_grid_combinations(args, ["a", "b"], exclude)
+    gs = GridSearch(args, exclude)
+    n_jobs, new_args = gs.get_combinations()
     assert n_jobs == 2
-    assert new_args.a == [2, 2]
-    assert new_args.b == [3, 4]
+    assert new_args["a"] == [2, 2]
+    assert new_args["b"] == [3, 4]
 
 
 def test_set_grid_combination_exclude_extra_val():
     exclude = [{"b": [4, 3]}]
+    gs = GridSearch({"a": [1, 2]}, exclude)
     with pytest.raises(ValueError):
-        _get_grid_combinations(args, ["a"], exclude)
+        gs.get_combinations()
